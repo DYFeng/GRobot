@@ -1,5 +1,6 @@
 GRobot
 ======
+
 GRobot is a powerful web robot,base on gevent and slenium.
 This project was came from [Ghost.py](http://jeanphix.me/Ghost.py).I changed a lot and renamed to GRobot.
 
@@ -10,9 +11,31 @@ page, extra_resources = robot.open("http://www.yahoo.com")
 assert page.http_status==200 and 'yahoo' in robot.content
 ```
 
+#What it can and can't do#
+--------------------------
+
+##Can do##
+
+- Can work with socks/http{s} proxy.
+- Can get back everything from cache.
+- Can simulate *ALL* the human operation.
+- Can run the webkit plugin.
+- Can evaluate javascript.
+- Can grab the web page as image.
+- Can run on a GUI-Less server(by install xvfb).
+
+##Can't do##
+
+- Can't operate Flash.
+- Can't run without PyQt and gevent
+- Can't send the human to the Mars.
+
+
+
 #Installation#
-------------
-First you need to install (PyQt)[http://www.riverbankcomputing.co.uk/software/pyqt/intro].
+-------------
+
+First you need to install [PyQt](http://www.riverbankcomputing.co.uk/software/pyqt/intro).
 
 Install gevent from the development version.
 
@@ -24,7 +47,8 @@ Install GRobot using pip.
     pip install GRobot
 
 #How to use#
-----------
+------------
+
 ##Quick start##
 
 First of all, you need a instance of GRobot in greenlet:
@@ -60,7 +84,7 @@ At the moment Httpresource objects provide the following attributes:
 
 Executing javascripts inside webkit frame is one of the most interesting features provided by GRobot:
 
-result, resources = robot.evaluate( "document.getElementById('my-input').getAttribute('value');")
+    result, resources = robot.evaluate( "document.getElementById('my-input').getAttribute('value');")
 
 The return value is a tuple of:
 
@@ -192,7 +216,6 @@ def main():
 if __name__ == '__main__':
     gevent.spawn(main).join()
 ```
-
 
 #Known Issues#
 --------------
