@@ -1,0 +1,11 @@
+language: python
+python:
+  - "2.7"
+install:
+  - sudo apt-get update
+  - sudo apt-get install python-qt4
+  - pip install http://gevent.googlecode.com/files/gevent-1.0b3.tar.gz#egg=gevent
+  - pip install Flask
+before_script:
+  - "export DISPLAY=:99.0"
+  - "sh -e /etc/init.d/xvfb start"
