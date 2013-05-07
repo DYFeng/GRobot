@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 import gevent
-
-from ghost import Ghost
 import sys, time
 from urlparse import urlparse
 
