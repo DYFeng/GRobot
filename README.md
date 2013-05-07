@@ -1,4 +1,4 @@
-GRobot
+GRobot  [![Build Status](https://travis-ci.org/DYFeng/GRobot.png)](https://travis-ci.org/DYFeng/GRobot)
 ======
 
 GRobot is a powerful web robot,base on gevent and slenium.
