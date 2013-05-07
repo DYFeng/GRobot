@@ -977,7 +977,7 @@ class GRobot(object):
                             'xmlextras.js', ]
 
         for script in selenium_scripts:
-            js_file = open(os.path.dirname(__file__) + '/selenium-scripts/' + script).read()
+            js_file = open(os.path.dirname(__file__) + '/../selenium-scripts/' + script).read()
             self.main_frame.evaluateJavaScript(js_file)
 
         self.main_frame.evaluateJavaScript(

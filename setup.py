@@ -17,7 +17,22 @@ setup(
     author_email='yyfeng88625@gmail.com',
     description='Powerful Web Robot.',
     long_description=__doc__,
-    data_files=[('grobot', ['README.md','license.txt' ])],
+    data_files=[
+        ('grobot', ['README.md','license.txt']),
+        ('selenium-scripts', ['selenium-scripts/atoms.js',
+                              'selenium-scripts/htmlutils.js',
+                              'selenium-scripts/selenium-logging.js',
+
+                              'selenium-scripts/find_matching_child.js',
+                              'selenium-scripts/selenium-api.js',
+                              'selenium-scripts/selenium-api-override.js',
+
+                              'selenium-scripts/selenium-browserbot.js',
+                              'selenium-scripts/selenium-browserdetect.js',
+                              'selenium-scripts/selenium-commandhandlers.js',
+                              'selenium-scripts/xmlextras.js',
+                              'selenium-scripts/license.txt']),
+    ],
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,

@@ -39,3 +39,7 @@ nosetests.xml
 *.swp
 .*~
 tags
+
+#virtualenv
+.venv
+.pypy
