@@ -34,3 +34,7 @@ nosetests.xml
 .project
 .pydevproject
 .idea
+
+# Tempfile
+*.swp
+.*~
