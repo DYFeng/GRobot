@@ -1,8 +1,8 @@
 GRobot  [![Build Status](https://travis-ci.org/DYFeng/GRobot.png)](https://travis-ci.org/DYFeng/GRobot)
 ======
 
-GRobot is a powerful web robot,base on gevent and slenium.
-This project was came from [Ghost.py](http://jeanphix.me/Ghost.py).I changed a lot and renamed to GRobot.
+GRobot is a powerful web robot based on gevent and selenium.
+This project comes from [Ghost.py](http://jeanphix.me/Ghost.py),which I have rewrote most of the code inside, and changed its name to GRobot.
 
 ```python
 from grobot import GRobot
@@ -16,10 +16,9 @@ assert page.http_status==200 and 'yahoo' in robot.content
 
 ##Can do##
 
-- Can work with socks/http{s} proxy.
-- Can get back everything from cache.
-- Can simulate *ALL* the human operation.
-- Can run the webkit plugin.
+- Can set up the socks5/http{s} proxy.
+- Can simulate *ALL* the operations of hunman beings.
+- Can run webkit plugin.
 - Can evaluate javascript.
 - Can grab the web page as image.
 - Can run on a GUI-Less server(by install xvfb).
@@ -28,6 +27,7 @@ assert page.http_status==200 and 'yahoo' in robot.content
 
 - Can't operate Flash.
 - Can't run without PyQt and gevent
+- Can't get back http status code.
 - Can't send the human to the Mars.
 
 

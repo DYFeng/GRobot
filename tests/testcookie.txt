@@ -1,0 +1,6 @@
+#LWP-Cookies-2.0
+Set-Cookie3: _domain="127.0.0.1"; path="/"; domain=localhost; path_spec; expires="2038-01-19 03:14:07Z"; version=0
+Set-Cookie3: _expires=2147483647; path="/"; domain=localhost; path_spec; expires="2038-01-19 03:14:07Z"; version=0
+Set-Cookie3: _secure_fail=sslonly; path="/"; domain=localhost; path_spec; secure; expires="2038-01-19 03:14:07Z"; version=0
+Set-Cookie3: _path="\"/get/\""; path="/get/"; domain=localhost; path_spec; expires="2038-01-19 03:14:07Z"; version=0
+Set-Cookie3: _path_fail="\"/set/\""; path="/set/"; domain=localhost; path_spec; expires="2038-01-19 03:14:07Z"; version=0

@@ -74,6 +74,7 @@ def image():
 @app.route('/upload', methods=['get', 'post'])
 def upload():
     if request.method == 'POST':
+
         file = request.files['simple-file']
         file.save(os.path.join(os.path.dirname(__file__),
             "uploaded_%s" % file.filename))
@@ -92,7 +93,7 @@ def mootools():
 
 
 @app.route('/settimeout')
-def mootools():
+def settimeout():
     return render_template('settimeout.html')
 
 

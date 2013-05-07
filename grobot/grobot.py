@@ -4,9 +4,9 @@ import sys, time
 from urlparse import urlparse
 
 from StringIO import StringIO
-from PyQt4.QtCore import *
-from PyQt4.QtWebKit import *
-from PyQt4.QtNetwork import *
+# from PyQt4.QtCore import *
+# from PyQt4.QtWebKit import *
+# from PyQt4.QtNetwork import *
 
 from functools import wraps
 from gevent.lock import RLock
@@ -17,14 +17,18 @@ import codecs
 import logging
 import subprocess
 import tempfile
+from cookielib import Cookie, LWPCookieJar
 
 import sip
 
 sip.setapi('QVariant', 2)
 from PyQt4 import QtWebKit
 from PyQt4.QtNetwork import QNetworkRequest, QNetworkAccessManager, \
-    QNetworkCookieJar, QNetworkDiskCache
-from PyQt4.QtCore import QSize, QByteArray, QUrl
+    QNetworkCookieJar, QNetworkDiskCache, QNetworkProxyFactory, QNetworkCookie
+from PyQt4.QtWebKit import QWebSettings, QWebPage, QWebView, QWebInspector
+from PyQt4.QtCore import QSize, QByteArray, QUrl, QDateTime, \
+    QtCriticalMsg, QtDebugMsg, QtFatalMsg, QtWarningMsg, \
+    qInstallMsgHandler, QString
 from PyQt4.QtGui import QApplication, QImage, QPainter
 
 
@@ -56,12 +60,7 @@ class XPath(object):
             return None
 
 
-
-
-
 _pattern_type = type(re.compile("", 0))
-
-
 
 
 class GRobotNetworkAccessManager(QNetworkAccessManager):
@@ -79,8 +78,9 @@ class GRobotWebPage(QtWebKit.QWebPage):
     Also intercepts client side console.log().
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, robot, parent=None):
         super(GRobotWebPage, self).__init__(parent)
+        self._robot = robot
         self.setNetworkAccessManager(GRobotNetworkAccessManager(self))
 
 
@@ -94,56 +94,59 @@ class GRobotWebPage(QtWebKit.QWebPage):
 
 
     #TODO:Need more time to test these.
-    # def chooseFile(self, frame, suggested_file=None):
-    #     return Ghost._upload_file
-    #
-    # def javaScriptConsoleMessage(self, message, line, source):
-    #     """Prints client console message in current output stream."""
-    #     super(GhostWebPage, self).javaScriptConsoleMessage(message, line,
-    #                                                        source)
-    #     log_type = "error" if "Error" in message else "info"
-    #     Logger.log("%s(%d): %s" % (source or '<unknown>', line, message),
-    #                sender="Frame", level=log_type)
-    #
-    # def javaScriptAlert(self, frame, message):
-    #     """Notifies ghost for alert, then pass."""
-    #     Ghost._alert = message
-    #     Logger.log("alert('%s')" % message, sender="Frame")
-    #
-    # def javaScriptConfirm(self, frame, message):
-    #     """Checks if ghost is waiting for confirm, then returns the right
-    #     value.
-    #     """
-    #     if Ghost._confirm_expected is None:
-    #         raise Exception('You must specified a value to confirm "%s"' %
-    #                         message)
-    #     confirmation, callback = Ghost._confirm_expected
-    #     Ghost._confirm_expected = None
-    #     Logger.log("confirm('%s')" % message, sender="Frame")
-    #     if callback is not None:
-    #         return callback()
-    #     return confirmation
-    #
-    # def javaScriptPrompt(self, frame, message, defaultValue, result=None):
-    #     """Checks if ghost is waiting for prompt, then enters the right
-    #     value.
-    #     """
-    #     if Ghost._prompt_expected is None:
-    #         raise Exception('You must specified a value for prompt "%s"' %
-    #                         message)
-    #     result_value, callback = Ghost._prompt_expected
-    #     Logger.log("prompt('%s')" % message, sender="Frame")
-    #     if callback is not None:
-    #         result_value = callback()
-    #     if result_value == '':
-    #         Logger.log("'%s' prompt filled with empty string" % message,
-    #                    level='warning')
-    #     Ghost._prompt_expected = None
-    #     if result is None:
-    #         # PySide
-    #         return True, result_value
-    #     result.append(result_value)
-    #     return True
+    def chooseFile(self, frame, suggested_file=None):
+        if self._robot._upload_file and os.path.isfile(self._robot._upload_file):
+            return QString(self._robot._upload_file)
+        else:
+            logger.error('upload file %s is not exist.' % self._robot._upload_file)
+
+    def javaScriptConsoleMessage(self, message, line, source):
+        """Prints client console message in current output stream."""
+        super(GRobotWebPage, self).javaScriptConsoleMessage(message, line,
+                                                            source)
+        log_type = "error" if "Error" in message else "info"
+        logger.log("%s(%d): %s" % (source or '<unknown>', line, message),
+                   sender="Frame", level=log_type)
+
+    def javaScriptAlert(self, frame, message):
+        """Notifies ghost for alert, then pass."""
+        self._alert = message
+        logger.log("alert('%s')" % message)
+
+    def javaScriptConfirm(self, frame, message):
+        """Checks if ghost is waiting for confirm, then returns the right
+        value.
+        """
+        if GRobot._confirm_expected is None:
+            raise Exception('You must specified a value to confirm "%s"' %
+                            message)
+        confirmation, callback = GRobot._confirm_expected
+        GRobot._confirm_expected = None
+        logger.log("confirm('%s')" % message)
+        if callback is not None:
+            return callback()
+        return confirmation
+
+    def javaScriptPrompt(self, frame, message, defaultValue, result=None):
+        """Checks if ghost is waiting for prompt, then enters the right
+        value.
+        """
+        if GRobot._prompt_expected is None:
+            raise Exception('You must specified a value for prompt "%s"' %
+                            message)
+        result_value, callback = GRobot._prompt_expected
+        logger.log("prompt('%s')" % message)
+        if callback is not None:
+            result_value = callback()
+        if result_value == '':
+            logger.log("'%s' prompt filled with empty string" % message,
+                       level='warning')
+        GRobot._prompt_expected = None
+        if result is None:
+            # PySide
+            return True, result_value
+        result.append(result_value)
+        return True
 
     def setUserAgent(self, user_agent):
         self.user_agent = user_agent
@@ -239,7 +242,7 @@ class QtMainLoop(object):
                 while self._app.hasPendingEvents():
                     self._app.processEvents()
                     gevent.sleep(0)
-                gevent.sleep(0.01)
+                gevent.sleep(1)
         except Exception, e:
             logger.error(e)
         logger.debug('Goodbye GRobot')
@@ -252,18 +255,18 @@ class HttpResource(object):
 
     def __init__(self, reply, cache, content=None):
         self.url = reply.url()
-        self.request_url=reply.request().url()
-        # self.content = content
+        self.request_url = unicode(reply.request().url().toString())
+        self.content = content
+        if self.content is None:
+            # Tries to get back content from cache
+            buffer = cache.data(self.url)
+            if buffer is not None:
+                content = buffer.readAll()
+                try:
+                    self.content = unicode(content)
+                except UnicodeDecodeError:
+                    self.content = content
 
-        # if self.content is None:
-        #     # Tries to get back content from cache
-        #     buffer = cache.data(self.url)
-        #     if buffer is not None:
-        #         content = buffer.readAll()
-        #         try:
-        #             self.content = unicode(content)
-        #         except UnicodeDecodeError:
-        #             self.content = content
         self.http_status = reply.attribute(
             QNetworkRequest.HttpStatusCodeAttribute)
 
@@ -286,7 +289,7 @@ class LoadingTimeout(Exception):
 
 class GRobot(object):
     class confirm:
-        """Statement that tells Ghost how to deal with javascript confirm().
+        """Statement that tells GRobot how to deal with javascript confirm().
 
         @param confirm: A bollean that confirm.
         @param callable: A callable that returns a boolean for confirmation.
@@ -304,7 +307,7 @@ class GRobot(object):
 
     _loop = None
     _liveRobot = 0
-    _alert = None
+
     _confirm_expected = None
     _prompt_expected = None
     _upload_file = None
@@ -347,6 +350,8 @@ class GRobot(object):
         self.exitLoop = False
         self.set_proxy(proxy)
 
+        self._alert = None
+
         self.http_resources = []
 
         self.user_agent = user_agent
@@ -375,7 +380,7 @@ class GRobot(object):
                 for p in plugin_path:
                     GRobot._app.addLibraryPath(p)
 
-        self.page = GRobotWebPage(GRobot._app)
+        self.page = GRobotWebPage(self, parent=GRobot._app)
         # QtWebKit.QWebSettings.setMaximumPagesInCache(0)
         # QtWebKit.QWebSettings.setObjectCacheCapacities(0, 0, 0)
         QtWebKit.QWebSettings.globalSettings().setAttribute(QtWebKit.QWebSettings.LocalStorageEnabled, True)
@@ -438,6 +443,12 @@ class GRobot(object):
         GRobot._loop = QtMainLoop(GRobot._app)
         GRobot._loop.start()
         GRobot.exit_lock.release()
+
+
+    @property
+    def url(self):
+        return unicode(self.main_frame.url().toString())
+
 
     @property
     def content(self):
@@ -544,6 +555,27 @@ class GRobot(object):
             QNetworkProxyFactory.setUseSystemConfiguration(True)
 
 
+
+    def set_file_input(self, selector, file):
+        from PyQt4.QtTest import QTest
+        from PyQt4.Qt import Qt
+        self._upload_file = file
+
+        if not self.display:
+            self.webview = QtWebKit.QWebView()
+            self.webview.setPage(self.page)
+            self.webview.hide()
+
+        for ele in self.main_frame.findAllElements(selector):
+            QTest.mouseClick(self.webview, Qt.LeftButton, pos=ele.geometry().center())
+
+        if not self.display:
+            self.webview.deleteLater()
+            # print self.main_frame.hitTestContent(ele.geometry().center())
+        # self.selenium('sendKeys', selector)
+        self._upload_file = None
+
+
     def capture(self, selector=None):
         """Capture the images of selector.
 
@@ -572,12 +604,15 @@ class GRobot(object):
         @return: The paths of saving.
         """
 
+        _, ext = os.path.splitext(path)
+        ext = ext[1:]
+
         imgs = self.capture(selector)
         result = []
         for index, img in enumerate(imgs):
             filepath = '%s.%s' % (path, index)
-            img.save(filepath)
-            result.append(filepath)
+            if img.save(filepath, ext.upper()):
+                result.append(filepath)
 
         return result
 
@@ -625,30 +660,33 @@ class GRobot(object):
         @param interval:Sleep `interval` seconds after the command.
         @return:
         """
-        ss = u"""var command=new SeleniumCommand('%s','%s','%s', false);
-            var handler=GCrawlerFactory.getCommandHandler(command.command);
-            if (handler)
-            {
-                command.target = selenium.preprocessParameter(command.target);
-                command.value = selenium.preprocessParameter(command.value);
 
-                try
-                {
-                    handler.execute(selenium, command);
-                }catch(e)
-                {
-                    if (e.isSeleniumError)
-                        e.message;
-                }
-
-            }else
-            {
-                'Do not hava command '+command.command;
-            }
-            """ % (
+        ss = u"do_selenium_command('%s','%s','%s')" % (
             command.replace("\'", "\\'"), target.replace("\'", "\\'"), value.replace("\'", "\\'").replace("\n", "\\n"),
-            #            str(command.encode('utf-8')), str(target.encode('utf-8')), str(value.encode('utf-8'))
         )
+        # ss = u"""var command=new SeleniumCommand('%s','%s','%s', false);
+        #     var handler=GCrawlerFactory.getCommandHandler(command.command);
+        #     if (handler)
+        #     {
+        #         command.target = selenium.preprocessParameter(command.target);
+        #         command.value = selenium.preprocessParameter(command.value);
+        #
+        #         try
+        #         {
+        #             handler.execute(selenium, command);
+        #         }catch(e)
+        #         {
+        #             if (e.isSeleniumError)
+        #                 e.message;
+        #         }
+        #
+        #     }else
+        #     {
+        #         'Do not hava command '+command.command;
+        #     }
+        #     """ % (
+        #     command.replace("\'", "\\'"), target.replace("\'", "\\'"), value.replace("\'", "\\'").replace("\n", "\\n"),
+        # )
         logger.debug("Command:%s\tTarget:%s\tValue:%s" % (command, target, value))
         result = self.evaluate(ss)
         gevent.sleep(interval)
@@ -727,7 +765,7 @@ class GRobot(object):
     #         """)
 
 
-    def filter_resources(self,pattern):
+    def filter_resources(self, pattern):
         """Filter resources with pattern.
 
         @param pattern: Match pattern.
@@ -742,8 +780,7 @@ class GRobot(object):
             is_match = pattern
         else:
             raise TypeError, 'pattern must be one of str,re.compile,callable'
-
-        return filter(lambda x: is_match(x.url), self.http_resources[:])
+        return filter(lambda x: is_match(x.request_url), self.http_resources)[:]
 
 
     def save(self, path):
@@ -755,6 +792,13 @@ class GRobot(object):
         f.write(self.content.encode('utf-8'))
         f.close()
 
+    def global_exists(self, global_name):
+        """Checks if javascript global exists.
+
+        :param global_name: The name of the global.
+        """
+        return self.evaluate('!(typeof %s === "undefined");' %
+                             global_name)
 
     def wait_for(self, condition, timeout_message='', time_for_stop=None):
         """Waits until condition is True.
@@ -782,14 +826,14 @@ class GRobot(object):
 
             gevent.sleep(2)
 
-
-    def global_exists(self, global_name):
-        """Checks if javascript global exists.
-
-        :param global_name: The name of the global.
+    def wait_for_alert(self):
+        """Waits for main frame alert().
         """
-        return self.evaluate('!(typeof %s === "undefined");' %
-                             global_name)[0]
+        self.wait_for(lambda: self._alert is not None,
+                      'User has not been alerted.')
+        msg = self._alert
+        self._alert = None
+        return msg
 
 
     def load_cookies( self, cookie_storage, keep_old=False ):
@@ -798,6 +842,7 @@ class GRobot(object):
         :param cookie_storage: file location string on disk or CookieJar instance.
         :param keep_old: Don't reset, keep cookies not overridden.
         """
+
         def toQtCookieJar( PyCookieJar, QtCookieJar ):
             allCookies = QtCookieJar.cookies if keep_old else []
             for pc in PyCookieJar:
@@ -806,11 +851,11 @@ class GRobot(object):
             QtCookieJar.setAllCookies(allCookies)
 
         def toQtCookie(PyCookie):
-            qc = QNetworkCookie( PyCookie.name, PyCookie.value )
+            qc = QNetworkCookie(PyCookie.name, PyCookie.value)
             qc.setSecure(PyCookie.secure)
             if PyCookie.path_specified:
                 qc.setPath(PyCookie.path)
-            if PyCookie.domain != "" :
+            if PyCookie.domain != "":
                 qc.setDomain(PyCookie.domain)
             if PyCookie.expires != 0:
                 t = QDateTime()
@@ -824,28 +869,81 @@ class GRobot(object):
             cj = LWPCookieJar(cookie_storage)
             cj.load()
             toQtCookieJar(cj, self.cookie_jar)
-        elif cookie_storage.__class__.__name__.endswith('CookieJar') :
+        elif cookie_storage.__class__.__name__.endswith('CookieJar'):
             toQtCookieJar(cookie_storage, self.cookie_jar)
         else:
             raise ValueError, 'unsupported cookie_storage type.'
+
+
+    def save_cookies(self, cookie_storage):
+        """Save to cookielib's CookieJar or Set-Cookie3 format text file.
+
+        :param cookie_storage: file location string or CookieJar instance.
+        """
+
+        def toPyCookieJar(QtCookieJar, PyCookieJar):
+            for c in QtCookieJar.allCookies():
+                PyCookieJar.set_cookie(toPyCookie(c))
+
+        def toPyCookie(QtCookie):
+            port = None
+            port_specified = False
+            secure = QtCookie.isSecure()
+            name = str(QtCookie.name())
+            value = str(QtCookie.value())
+            v = str(QtCookie.path())
+            path_specified = bool(v != "")
+            path = v if path_specified else None
+            v = str(QtCookie.domain())
+            domain_specified = bool(v != "")
+            domain = v
+            domain_initial_dot = v.startswith('.') if domain_specified else None
+            v = long(QtCookie.expirationDate().toTime_t())
+            # Long type boundary on 32bit platfroms; avoid ValueError
+            expires = 2147483647 if v > 2147483647 else v
+            rest = {}
+            discard = False
+            return Cookie(0, name, value, port, port_specified, domain
+                , domain_specified, domain_initial_dot, path, path_specified
+                , secure, expires, discard, None, None, rest)
+
+        if cookie_storage.__class__.__name__ == 'str':
+            cj = LWPCookieJar(cookie_storage)
+            toPyCookieJar(self.cookie_jar, cj)
+            cj.save()
+        elif cookie_storage.__class__.__name__.endswith('CookieJar'):
+            toPyCookieJar(self.cookie_jar, cookie_storage)
+        else:
+            raise ValueError, 'unsupported cookie_storage type.'
+
+
+    def wait_for_selector(self, selector):
+        """Waits until selector match an element on the frame.
+
+        :param selector: The selector to wait for.
+        """
+        self.wait_for(lambda: self.exists(selector),
+                      'Can\'t find element matching "%s"' % selector)
 
     def wait_for_page_loaded(self, time_for_stop=None):
         """Waits until page is loaded, assumed that a page as been requested.
 
         """
-        self.wait_for(lambda: self.loaded,
-                      'Unable to load requested page', time_for_stop=time_for_stop)
+        return self.wait_for(lambda: self.loaded,
+                             'Unable to load requested page', time_for_stop=time_for_stop)
 
         # resources = self._release_last_resources()
 
-        page = None
-        url = str(self.main_frame.url().toString().toUtf8())
-        url_without_hash = url.split("#")[0]
+        # page = None
+        # url = str(self.main_frame.url().toString().toUtf8())
+        # url_without_hash = url.split("#")[0]
 
-
-        page=self.filter_resources(url) or self.filter_resources(url_without_hash)
-
-        return page[0]
+        # print self.http_resources
+        #
+        # page=self.filter_resources(url) or self.filter_resources(url_without_hash)
+        #
+        #
+        # return page[0]
 
 
     def _release_last_resources(self):
@@ -886,7 +984,32 @@ class GRobot(object):
             """selenium=Selenium.createForWindow(window);
             GCrawlerFactory = new CommandHandlerFactory();
             GCrawlerFactory.registerAll(selenium);
-            """)
+
+            function do_selenium_command(command,target,value)
+            {
+                var command=new SeleniumCommand(command,target,value, false);
+                var handler=GCrawlerFactory.getCommandHandler(command.command);
+                if (handler)
+                {
+                    command.target = selenium.preprocessParameter(command.target);
+                    command.value = selenium.preprocessParameter(command.value);
+
+                try
+                {
+                    handler.execute(selenium, command);
+                }catch(e)
+                {
+                    if (e.isSeleniumError)
+                        e.message;
+                }
+
+                }else
+                {
+                    'Do not hava command '+command.command;
+                }
+            }
+
+""")
 
         self.loaded = True
         # self.cache.clear()
