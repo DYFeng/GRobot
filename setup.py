@@ -17,7 +17,7 @@ setup(
     author_email='yyfeng88625@gmail.com',
     description='Powerful Web Robot.',
     long_description=__doc__,
-    data_files=[('grobot', ['README.md', ])],
+    data_files=[('grobot', ['README.md','license.txt' ])],
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
