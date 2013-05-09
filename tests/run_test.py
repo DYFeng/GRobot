@@ -4,10 +4,12 @@ import os
 import unittest
 import logging
 
-from grobot import GRobot
+from grobot import GRobot,confirm,prompt
 from app import app
 import gevent
 from gevent.wsgi import WSGIServer
+from PyQt4.QtWebKit import *
+from PyQt4.QtCore import *
 
 PORT = 5000
 
@@ -30,10 +32,10 @@ class GRobotTest(unittest.TestCase):
         cls.server.kill()
 
     def tearDown(self):
-        del self.robot
+        self.robot=None
 
     def setUp(self):
-        self.robot = GRobot(display=False, develop=False, log_level=logging.DEBUG)
+        self.robot = GRobot(display=False, develop=True, log_level=logging.DEBUG)
 
 
     def test_open(self):
@@ -56,12 +58,12 @@ class GRobotTest(unittest.TestCase):
         self.robot.open(base_url)
         self.assertEqual(self.robot.evaluate("x='ghost'; x;"), 'ghost')
 
-    def test_external_api(self):
-        self.robot.open("%smootools" % base_url)
-        resources = self.robot.http_resources[:]
-        self.assertEqual(len(resources), 2)
-        self.assertEqual(type(self.robot.evaluate("document.id('list')")),
-                         dict)
+    # def test_external_api(self):
+    #     self.robot.open("%smootools" % base_url)
+    #     resources = self.robot.http_resources[:]
+    #     self.assertEqual(len(resources), 2)
+    #     self.assertEqual(type(self.robot.evaluate("document.id('list')")),
+    #                      dict)
 
     # def test_extra_resource_content(self):
     #     self.robot.open("%smootools" % base_url)
@@ -75,10 +77,10 @@ class GRobotTest(unittest.TestCase):
 
     def test_wait_for_selector(self):
         self.robot.open("%smootools" % base_url)
-        success = self.robot.selenium("click", "id=button")
-        success = self.robot.wait_for_selector("#list li:nth-child(2)")
+        self.robot.selenium("click", "id=button")
+        self.robot.wait_for_selector("#list li:nth-child(2)")
 
-        self.assertEqual(self.robot.http_resources[1].url, "%sitems.json" % base_url)
+        self.assertEqual(self.robot.http_resources[-1].url, "%sitems.json" % base_url)
 
 
     def test_settimeout(self):
@@ -94,7 +96,7 @@ class GRobotTest(unittest.TestCase):
         self.robot.open("%smootools" % base_url)
         self.robot.selenium("click", "id=button")
         self.robot.wait_for_text("second item")
-        self.assertEqual(self.robot.http_resources[1].url, "%sitems.json" % base_url)
+        self.assertEqual(self.robot.http_resources[-1].url, "%sitems.json" % base_url)
 
 
     def test_wait_for_timeout(self):
@@ -187,67 +189,82 @@ class GRobotTest(unittest.TestCase):
         self.assertTrue('OK' in self.robot.content)
         os.remove('testcookie.txt')
 
-    # def test_wait_for_alert(self):
-    #     self.robot.open("%salert" % base_url)
-    #     self.robot.click('#alert-button')
-    #     msg = self.robot.wait_for_alert()
-    #     self.assertEqual(msg, 'this is an alert')
-    #
-    # def test_confirm(self):
-    #     self.robot.open("%salert" % base_url)
-    #     with GRobot.confirm():
-    #         self.robot.selenium('click','id=confirm-button')
-    #     msg = self.robot.wait_for_alert()
-    #     self.assertEqual(msg, 'you confirmed!')
-    #
-    # def test_no_confirm(self):
-    #     self.robot.open("%salert" % base_url)
-    #     with GRobot.confirm(False):
-    #         self.robot.selenium('click','id=confirm-button')
-    #     msg = self.robot.wait_for_alert()
-    #     self.assertEqual(msg, 'you denied!')
-    #
-    # def test_confirm_callback(self):
-    #     self.robot.open("%salert" % base_url)
-    #     with GRobot.confirm(callback=lambda: False):
-    #         self.robot.click('#confirm-button')
-    #     msg = self.robot.wait_for_alert()
-    #     self.assertEqual(msg, 'you denied!')
-    #
-    # def test_prompt(self):
-    #     self.robot.open("%salert" % base_url)
-    #     with GRobot.prompt('my value'):
-    #         self.robot.click('#prompt-button')
-    #     value = self.robot.evaluate('promptValue')
-    #     self.assertEqual(value, 'my value')
-    #
-    # def test_prompt_callback(self):
-    #     self.robot.open("%salert" % base_url)
-    #     with GRobot.prompt(callback=lambda: 'another value'):
-    #         self.robot.click('#prompt-button')
-    #     value = self.robot.evaluate('promptValue')
-    #     self.assertEqual(value, 'another value')
-    #
-    # def test_popup_messages_collection(self):
-    #     self.robot.open("%salert" % base_url, default_popup_response=True)
-    #     self.robot.click('#confirm-button')
-    #     self.assertIn('this is a confirm', self.robot.popup_messages)
-    #     self.robot.click('#prompt-button')
-    #     self.assertIn('Prompt ?', self.robot.popup_messages)
-    #     self.robot.click('#alert-button')
-    #     self.assertIn('this is an alert', self.robot.popup_messages)
-    #
-    # def test_prompt_default_value_true(self):
-    #     self.robot.open("%salert" % base_url, default_popup_response=True)
-    #     self.robot.click('#confirm-button')
-    #     msg = self.robot.wait_for_alert()
-    #     self.assertEqual(msg, 'you confirmed!')
-    #
-    # def test_prompt_default_value_false(self):
-    #     self.robot.open("%salert" % base_url, default_popup_response=False)
-    #     self.robot.click('#confirm-button')
-    #     msg = self.robot.wait_for_alert()
-    #     self.assertEqual(msg, 'you denied!')
+    def test_wait_for_alert(self):
+        self.robot.open("%salert" % base_url)
+        self.robot.selenium('click','id=alert-button')
+        msg = self.robot.wait_for_alert()
+        self.assertEqual(msg, 'this is an alert')
+
+    def test_confirm(self):
+        self.robot.open("%salert" % base_url)
+        with confirm(self.robot):
+            self.robot.selenium('click','id=confirm-button')
+        msg = self.robot.wait_for_alert()
+        self.assertEqual(msg, 'you confirmed!')
+
+    def test_no_confirm(self):
+        self.robot.open("%salert" % base_url)
+        with confirm(self.robot,False):
+            self.robot.selenium('click','id=confirm-button')
+        msg = self.robot.wait_for_alert()
+        self.assertEqual(msg, 'you denied!')
+
+    def test_confirm_callback(self):
+        self.robot.open("%salert" % base_url)
+        with confirm(self.robot,callback=lambda: False):
+            self.robot.selenium('click','id=confirm-button')
+        msg = self.robot.wait_for_alert()
+        self.assertEqual(msg, 'you denied!')
+
+    def test_prompt(self):
+        self.robot.open("%salert" % base_url)
+        with prompt(self.robot,'my value'):
+            self.robot.selenium('click','id=prompt-button')
+        value = self.robot.evaluate('promptValue')
+        self.assertEqual(value, 'my value')
+
+
+    def test_prompt_callback(self):
+        self.robot.open("%salert" % base_url)
+        with prompt(self.robot,callback=lambda: 'another value'):
+            self.robot.selenium('click','id=prompt-button')
+        value = self.robot.evaluate('promptValue')
+        self.assertEqual(value, 'another value')
+
+    def test_popup_messages_collection(self):
+
+        self.robot.open("%salert" % base_url)
+
+        def _test():
+            self.assertIn('this is a confirm', self.robot.popup_messages)
+            return True
+
+        with confirm(self.robot,True,callback=_test):
+            self.robot.selenium('click','id=confirm-button')
+
+        self.robot.wait_for_alert()
+
+
+        with prompt(self.robot,confirm=False):
+            self.robot.selenium('click','id=prompt-button')
+
+        self.assertIn('Prompt ?', self.robot.popup_messages)
+
+        self.robot.selenium('click','id=alert-button')
+
+        self.assertIn('this is an alert', self.robot.popup_messages)
+
+    def test_prompt_default_value_true(self):
+        self.robot.open("%salert" % base_url, default_popup_response=True)
+        self.robot.selenium('click','id=confirm-button')
+        msg = self.robot.wait_for_alert()
+        self.assertEqual(msg, 'you confirmed!')
+
+    def test_prompt_default_value_false(self):
+        self.robot.open("%salert" % base_url, default_popup_response=False)
+        self.robot.selenium('click','id=confirm-button')
+        msg = self.robot.wait_for_alert()
+        self.assertEqual(msg, 'you denied!')
 
     # def test_capture_to(self):
     #     self.robot.open(base_url)
@@ -335,9 +352,7 @@ class GRobotTest(unittest.TestCase):
 
     def test_set_simple_file_field(self):
         self.robot.open("%supload" % base_url)
-
         self.robot.set_file_input('#simple-file', os.path.dirname(__file__) + '/static/blackhat.jpg')
-
         self.robot.selenium('click', "xpath=//input[@type='submit']"
             , expect_loading=True)
 
@@ -347,16 +362,16 @@ class GRobotTest(unittest.TestCase):
         os.remove(file_path)
 
 
-    # def test_basic_http_auth_success(self):
-    #     self.robot.open("%sbasic-auth" % base_url,
-    #                            auth=('admin', 'secret'))
-    #     self.assertEqual(page.http_status, 200)
-    #
-    #
-    # def test_basic_http_auth_error(self):
-    #     self.robot.open("%sbasic-auth" % base_url,
-    #                            auth=('admin', 'wrongsecret'))
-    #     self.assertEqual(page.http_status, 401)
+    def test_basic_http_auth_success(self):
+        self.robot.open("%sbasic-auth" % base_url,
+                               auth=('admin', 'secret'))
+        self.assertIn('successfully authenticated' , self.robot.content )
+
+
+    def test_basic_http_auth_error(self):
+        self.robot.open("%sbasic-auth" % base_url,
+                               auth=('admin', 'wrongsecret'))
+        self.assertIn('Could not verify your access level for that URL.' , self.robot.content )
 
 
     def test_unsupported_content(self):

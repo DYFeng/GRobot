@@ -381,7 +381,8 @@ BrowserBot.prototype._modifyWindow = function(win) {
     // find it later. This is slightly different from uniqueId.
     win.seleniumKey = BrowserBot.uniqueKey++;
 
-    this.modifyWindowToRecordPopUpDialogs(win, this);
+	//Don't using selenium control popup
+    //this.modifyWindowToRecordPopUpDialogs(win, this);
     
     //Commenting out for issue 1854
     //win[this.uniqueId] = 1;

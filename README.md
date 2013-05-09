@@ -7,8 +7,8 @@ This project comes from [Ghost.py](http://jeanphix.me/Ghost.py),which I have rew
 ```python
 from grobot import GRobot
 robot = GRobot()
-page, extra_resources = robot.open("http://www.yahoo.com")
-assert page.http_status==200 and 'yahoo' in robot.content
+robot.open("http://www.yahoo.com")
+assert 'yahoo' in robot.content
 ```
 
 #What it can and can't do#
@@ -28,7 +28,7 @@ assert page.http_status==200 and 'yahoo' in robot.content
 - Can't operate Flash.
 - Can't run without PyQt and gevent
 - Can't get back http status code.
-- Can't send the human to the Mars.
+- Can't transport human to the Mars.
 
 
 
@@ -41,6 +41,13 @@ Install gevent from the development version.
 
     pip install http://gevent.googlecode.com/files/gevent-1.0b3.tar.gz#egg=gevent
 
+Install lxml
+
+    pip install lxml
+
+Install Flask for unittest
+
+    pip install Flask
 
 Install GRobot using pip.
 
@@ -48,7 +55,6 @@ Install GRobot using pip.
 
 #How to use#
 ------------
-
 ##Quick start##
 
 First of all, you need a instance of GRobot in greenlet:
@@ -56,8 +62,10 @@ First of all, you need a instance of GRobot in greenlet:
 ```python
 import gevent
 from grobot import GRobot
+
 def test():
     robot = GRobot()
+    #do something
 
 gevent.spawn(test).join()
 ```
@@ -66,7 +74,7 @@ gevent.spawn(test).join()
 
 GRobot provide a method that open web page the following way:
 
-    page, resources = ghost.open('http://my.web.page')
+    robot.open('http://my.web.page')
 
 This method returns a tuple of main resource (web page) and all loaded resources (such as CSS files, javascripts, images...).
 
@@ -84,18 +92,15 @@ At the moment Httpresource objects provide the following attributes:
 
 Executing javascripts inside webkit frame is one of the most interesting features provided by GRobot:
 
-    result, resources = robot.evaluate( "document.getElementById('my-input').getAttribute('value');")
+    result = robot.evaluate( "document.getElementById('my-input').getAttribute('value');")
 
 The return value is a tuple of:
 
 - last javascript last statement result.
-- loaded resources (e.g.: when an XHR is fired up).
 
 As many other Ghost methods, you can pass an extra parameter that tells Ghost you expect a page loading:
 
-    page, resources = robot.evaluate( "document.getElementById('link').click();", expect_loading=True)
-
-Then the result tuple wil be the same as the one returned by GRobot.open().
+    robot.evaluate( "document.getElementById('link').click();", expect_loading=True)
 
 ##Play with selenium##
 
@@ -129,33 +134,41 @@ You can specify the state of checkboot
 
     robot.selenium('click',"xpath=//input[@type='submit']")
 
+
 ###Drag and drop###
 Drag and drop element.
 
     robot.selenium('dragAndDropToObject',"id=I'm a stone","id=I'm a bottle")
 
 
+###Setup input file###
+
+Selenium can't access the `<input type='file'/>` tag.You can't use selenium to set up a file type input.
+
+    robot.set_file_input('#file-upload', '/tmp/file')
+
 ##Waiters##
+
 GRobot provides several methods for waiting for specific things before the script continue execution:
 
 ###wait_for_page_loaded()###
 
 That wait until a new page is loaded.
 
-    page, resources = robot.wait_for_page_loaded()
+    robot.wait_for_page_loaded()
 
 
 ###wait_for_selector(selector)###
 
-That wait until a element match the given selector.
+That wait until a element match the given css selector.
 
-    result, resources = robot.wait_for_selector("ul.results")
+    result = robot.wait_for_selector("ul.results")
 
 ###wait_for_text(text)###
 
 That wait until the given text exists inside the frame.
 
-    result, resources = robot.wait_for_selector("My result")
+    result = robot.wait_for_text("My result")
 
 
 ##Sample use case##
@@ -174,9 +187,7 @@ def main():
     robot.set_proxy('socks5://127.0.0.1:7070')
 
     #Open google
-    page, resources = robot.open('http://www.google.com/')
-
-    assert page.http_status == 200
+    robot.open('http://www.google.com/')
 
     # Filter the google logo file
     pattern = re.compile(r"^.*logo.*\.(png|gif)$")
@@ -196,7 +207,6 @@ def main():
 
     for i in xrange(1, 10):
         # Waiting for the ajax page loading.
-        print i
 
         robot.wait_for_xpath("//tr/td[@class='cur' and text()='%s']" % i)
 
@@ -219,9 +229,9 @@ if __name__ == '__main__':
 
 #Known Issues#
 --------------
-
 - I never plan to support windows.If it works well on windows,that's great.If it not,please help yourselvers.
 - It does not support PySide.For now,PySide is still under develop.It lacked some methods.
+- You can't get back the conent from cache.Ghost.py can do this.But I don't think it's reliable.
 
     
 
