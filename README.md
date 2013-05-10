@@ -98,7 +98,7 @@ The return value is a tuple of:
 
 - last javascript last statement result.
 
-As many other Ghost methods, you can pass an extra parameter that tells Ghost you expect a page loading:
+As many other GRobot methods, you can pass an extra parameter that tells GRobot you expect a page loading:
 
     robot.evaluate( "document.getElementById('link').click();", expect_loading=True)
 
