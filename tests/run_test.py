@@ -164,7 +164,7 @@ class GRobotTest(unittest.TestCase):
 
     def test_click_link(self):
         self.robot.open("%s" % base_url)
-        self.robot.selenium('click', 'xpath=//a', expect_loading=True)
+        self.robot.click('xpath=//a', expect_loading=True)
         self.assertEqual(self.robot.url, "%sform" % base_url)
 
 
@@ -352,7 +352,7 @@ class GRobotTest(unittest.TestCase):
 
     def test_set_simple_file_field(self):
         self.robot.open("%supload" % base_url)
-        self.robot.set_file_input('#simple-file', os.path.dirname(__file__) + '/static/blackhat.jpg')
+        self.robot.set_file_input('id=simple-file', os.path.dirname(__file__) + '/static/blackhat.jpg')
         self.robot.selenium('click', "xpath=//input[@type='submit']"
             , expect_loading=True)
 

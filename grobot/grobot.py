@@ -20,16 +20,14 @@ import sip
 
 sip.setapi(u'QVariant', 2)
 
-
 from PyQt4.Qt import Qt
 from PyQt4.QtTest import QTest
 from PyQt4 import QtWebKit
-from PyQt4.QtNetwork import QNetworkRequest, QNetworkAccessManager, \
+from PyQt4.QtNetwork import QNetworkRequest, QNetworkAccessManager, QNetworkProxy, \
     QNetworkCookieJar, QNetworkDiskCache, QNetworkProxyFactory, QNetworkCookie
 from PyQt4.QtWebKit import QWebSettings, QWebPage, QWebView, QWebInspector
 from PyQt4.QtCore import QSize, QByteArray, QUrl, QDateTime, \
-    QtCriticalMsg, QtDebugMsg, QtFatalMsg, QtWarningMsg
-
+    QtCriticalMsg, QtDebugMsg, QtFatalMsg, QtWarningMsg, QPoint
 
 from PyQt4.QtGui import QApplication, QImage, QPainter
 
@@ -124,7 +122,7 @@ class GRobotWebPage(QtWebKit.QWebPage):
             return callback()
         return confirmation
 
-    def javaScriptPrompt(self, frame, message, defaultValue,result=None):
+    def javaScriptPrompt(self, frame, message, defaultValue, result=None):
         """Checks if GRobot is waiting for prompt, then enters the right
         value.
         """
@@ -132,7 +130,7 @@ class GRobotWebPage(QtWebKit.QWebPage):
             raise Exception('You must specified a value for prompt "%s"' %
                             message)
 
-        result_value, callback,confirm = self._robot._prompt_expected
+        result_value, callback, confirm = self._robot._prompt_expected
         logger.debug("prompt('%s')" % message)
 
         if callback is not None:
@@ -143,7 +141,7 @@ class GRobotWebPage(QtWebKit.QWebPage):
 
         result.append(result_value)
 
-        self._robot._prompt_expected=None
+        self._robot._prompt_expected = None
         self._robot.popup_messages = message
 
         return confirm
@@ -155,8 +153,7 @@ class GRobotWebPage(QtWebKit.QWebPage):
         return self.user_agent
 
 
-default_user_agent = "Mozilla/6.0 (X11; Linux x86_64) AppleWebKit/535.2 " + \
-                     "(KHTML, like Gecko) Chrome/15.0.874.121 Safari/535.2"
+default_user_agent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:20.0) Gecko/20100101 Firefox/20.0"
 
 
 def can_load_page(func):
@@ -181,15 +178,33 @@ def can_load_page(func):
     return wrapper
 
 
+def need_webview(func):
+    """Decorator that specifies if user can expect page loading from
+    this action. If expect_loading is set to True, GRobot will wait
+    for page_loaded event.
+
+    """
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if not self.display:
+            self.webview = self.webview or QtWebKit.QWebView()
+            self.webview.setPage(self.page)
+            self.webview.hide()
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
+
 def singleton(class_):
     class class_w(class_):
         _instance = None
 
         def __new__(class_, *args, **kwargs):
             if class_w._instance is None:
-                class_w._instance = super(class_w,class_).__new__(class_,
-                                                          *args,
-                                                          **kwargs)
+                class_w._instance = super(class_w, class_).__new__(class_,
+                                                                   *args,
+                                                                   **kwargs)
                 class_w._instance._sealed = False
             return class_w._instance
 
@@ -312,19 +327,18 @@ class prompt:
     @param callback: A callable that returns the value to fill in.
     """
 
-    def __init__(self, robot, value='',confirm=True, callback=None):
+    def __init__(self, robot, value='', confirm=True, callback=None):
         self.value = value
         self.callback = callback
-        self.confirm=confirm
+        self.confirm = confirm
         self._robot = robot
 
     def __enter__(self):
-        self._robot._prompt_expected = (self.value, self.callback,self.confirm)
+        self._robot._prompt_expected = (self.value, self.callback, self.confirm)
 
     def __exit__(self, type, value, traceback):
         gevent.sleep(2)
         self._robot.wait_for(lambda: self._robot._confirm_expected is None)
-
 
 
 class GRobot(object):
@@ -370,7 +384,7 @@ class GRobot(object):
         self.exitLoop = False
         self.set_proxy(proxy)
 
-        self.popup_messages=None
+        self.popup_messages = None
 
         self._confirm_expected = None
         self._prompt_expected = None
@@ -405,7 +419,7 @@ class GRobot(object):
                 for p in plugin_path:
                     GRobot._app.addLibraryPath(p)
 
-        self.page = GRobotWebPage(self,GRobot._app)
+        self.page = GRobotWebPage(self, GRobot._app)
 
         QtWebKit.QWebSettings.setMaximumPagesInCache(0)
         QtWebKit.QWebSettings.setObjectCacheCapacities(0, 0, 0)
@@ -413,7 +427,7 @@ class GRobot(object):
 
         self.page.setForwardUnsupportedContent(True)
 
-        self.set_viewport_size(*viewport_size)
+
 
         # Page signals
         self.page.loadFinished.connect(self._page_loaded)
@@ -457,6 +471,8 @@ class GRobot(object):
             self.webview.setPage(self.page)
             self.webview.show()
 
+        self.set_viewport_size(*viewport_size)
+
         self.page.settings().setAttribute(QtWebKit.QWebSettings.PluginsEnabled, plugins_enabled)
         self.page.settings().setAttribute(QtWebKit.QWebSettings.JavaEnabled, java_enabled)
         self.page.settings().setAttribute(QWebSettings.DeveloperExtrasEnabled, self.develop)
@@ -478,9 +494,8 @@ class GRobot(object):
         return self._popup_messages
 
     @popup_messages.setter
-    def popup_messages(self,value):
-        self._popup_messages=unicode(value)
-
+    def popup_messages(self, value):
+        self._popup_messages = unicode(value)
 
 
     @property
@@ -529,7 +544,6 @@ class GRobot(object):
         self._enable_javascript = value
 
 
-
     def open(self, address, method='get', headers=None, auth=None, body=None,
              default_popup_response=None):
         """Opens a web page.
@@ -573,6 +587,9 @@ class GRobot(object):
         @param width: An integer that sets width pixel count.
         @param height: An integer that sets height pixel count.
         """
+
+        if self.display:
+            self.webview.resize(QSize(width, height))
         self.page.setViewportSize(QSize(width, height))
 
     def set_proxy(self, proxy=None):
@@ -602,23 +619,120 @@ class GRobot(object):
             QNetworkProxyFactory.setUseSystemConfiguration(True)
 
 
-    def direct_click(self, pos):
-        if not self.display:
-            self.webview = self.webview or QtWebKit.QWebView()
-            self.webview.setPage(self.page)
-            self.webview.hide()
-        QTest.mouseClick(self.webview, Qt.LeftButton, pos=pos)
+    def get_postions_from_selector(self, selector):
+        if selector.startswith('xpath='):
+            query = selector[6:]
+            postions = self.evaluate(u"""
+            function GetAbsoluteLocationEx(element)
+{
+    if ( arguments.length != 1 || element == null )
+    {
+        return null;
+    }
+    var elmt = element;
+    var offsetTop = elmt.offsetTop;
+    var offsetLeft = elmt.offsetLeft;
+    var offsetWidth = elmt.offsetWidth;
+    var offsetHeight = elmt.offsetHeight;
+    while( elmt = elmt.offsetParent )
+    {
+          // add this judge
+        if ( elmt.style.position == 'absolute' || elmt.style.position == 'relative'
+            || ( elmt.style.overflow != 'visible' && elmt.style.overflow != '' ) )
+        {
+            break;
+        }
+        offsetTop += elmt.offsetTop;
+        offsetLeft += elmt.offsetLeft;
+    }
+    return { absoluteTop: offsetTop, absoluteLeft: offsetLeft,
+        offsetWidth: offsetWidth, offsetHeight: offsetHeight };
+}
 
-        if not self.display:
-            self.webview.deleteLater()
+
+                result=[];
+                for (var r = document.evaluate('%s', document, null, 5, null), n; n = r.iterateNext();) {
+                //result.push([n.scrollLeft+n.offsetWidth/2.0,n.scrollTop+n.offsetHeight/2.0]);
+                pos=GetAbsoluteLocationEx(n)
+                pos
+                result.push([pos.absoluteLeft+pos.offsetWidth/2.0,pos.absoluteTop+pos.offsetHeight/2.0]);
+                }
+                result
+            """ % query.replace("\'", "\\'"))
+            return map(lambda x: tuple(x), postions)
+        elif selector.startswith('css='):
+            query = selector[4:]
+
+            def qpoint_to_tuple(point):
+                return (point.x(), point.y())
+
+            return [qpoint_to_tuple(x.geometry().center()) for x in self.main_frame.findAllElements(query)]
+        elif selector.startswith('id='):
+            query = selector[3:]
+            return self.get_postions_from_selector('css=#' + query)
+        elif selector.startswith('link='):
+            query = selector[5:]
+            return self.get_postions_from_selector("xpath=//a[@text()='%s']" + query)
+        elif selector.startswith('dom='):
+            query = selector[4:]
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
+
+
+    def set_page_center(self, postion):
+        width = self.evaluate("document.documentElement.clientWidth")
+        height = self.evaluate("document.documentElement.clientHeight")
+        self.main_frame.setScrollPosition(QPoint(postion[0] - width / 2.0, postion[1] - height / 2.0))
+
+
+
+    @need_webview
+    def reload(self):
+        """Reload page.
+
+        @return:
+        """
+        self.loaded = False
+        self.page.triggerAction('Reload')
+        return self.wait_for_page_loaded()
+
+    @need_webview
+    def trigger_action(self, action):
+        self.page.triggerAction(getattr(QWebPage, action))
+
+
+    @need_webview
+    @can_load_page
+    def click(self, selector):
+        postions = self.get_postions_from_selector(selector)
+        if postions:
+            postion=postions[0]
+            self.set_page_center(postion)
+            pos = QPoint(
+                postion[0]-self.main_frame.scrollPosition().x(),
+                postion[1]-self.main_frame.scrollPosition().y(),
+                         )
+            QTest.mouseMove(self.webview, pos=pos, delay=100)
+            QTest.mouseClick(self.webview, Qt.LeftButton, pos=pos, delay=100)
+        else:
+            logger.warning("Can't locate selector " + selector)
+
+
+    def type(self, text, selector=None, delay=20):
+        if selector:
+            self.click(selector)
+        QTest.keyClicks(self.webview, text, delay=delay)
+
+
 
 
     def set_file_input(self, selector, file):
 
         self._upload_file = file
 
-        for ele in self.main_frame.findAllElements(selector):
-            self.direct_click(pos=ele.geometry().center())
+        # for ele in self.main_frame.findAllElements(selector):
+        self.click(selector)
 
         self._upload_file = None
 
@@ -745,7 +859,7 @@ class GRobot(object):
 
         @param script: The script to evaluate.
         """
-        result=self.main_frame.evaluateJavaScript("%s" % script)
+        result = self.main_frame.evaluateJavaScript("%s" % script)
         # if isinstance(result,QString):
         #     result=unicode(result)
         return result
@@ -1016,7 +1130,7 @@ class GRobot(object):
         return last_resources
 
 
-    def _page_loaded(self,success):
+    def _page_loaded(self, success):
         if self.develop and self.display:
             if self.inspector is None:
                 self.inspector = QWebInspector()

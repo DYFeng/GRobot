@@ -17,6 +17,9 @@ setup(
     author_email='yyfeng88625@gmail.com',
     description='Powerful Web Robot.',
     long_description=__doc__,
+    install_requires=[
+        'lxml',
+        ],
     data_files=[
         ('grobot', ['README.md','license.txt']),
         ('selenium-scripts', ['selenium-scripts/atoms.js',

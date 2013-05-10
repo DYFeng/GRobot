@@ -37,15 +37,15 @@ assert 'yahoo' in robot.content
 
 First you need to install [PyQt](http://www.riverbankcomputing.co.uk/software/pyqt/intro).
 
+In Ubuntu
+
+    sudo apt-get install python-qt4
+
 Install gevent from the development version.
 
     pip install http://gevent.googlecode.com/files/gevent-1.0b3.tar.gz#egg=gevent
 
-Install lxml
-
-    pip install lxml
-
-Install Flask for unittest
+Install Flask for unittest(optional).
 
     pip install Flask
 
@@ -145,7 +145,26 @@ Drag and drop element.
 
 Selenium can't access the `<input type='file'/>` tag.You can't use selenium to set up a file type input.
 
-    robot.set_file_input('#file-upload', '/tmp/file')
+    robot.set_file_input('id=file-upload', '/tmp/file')
+
+
+##Play without selenium##
+Selenium is powerful,but it can't work everythere.You may want to use some native tool.
+Not like selenium,the native tool will control your system mouse and keyboard.
+
+##Click##
+
+    robot.click('id=submit_it')
+
+##Type Text##
+
+Typing text word by word.
+
+    robot.type('Hello world.')
+
+Click the dom of selector and type.
+
+    robot.type('Hello world.','id=note-text')
 
 ##Waiters##
 
@@ -173,15 +192,55 @@ That wait until the given text exists inside the frame.
 
 ##Sample use case##
 
-###Browsing Google.com and find GRobot project###
+###Post a twitter with native tool###
 
 ```python
 import gevent
+import logging
 from grobot import GRobot
+
+USERNAME = 'your twitter username'
+PASSWORD = 'your twitter password'
+
+
+def main():
+    robot = GRobot(display=True, log_level=logging.DEBUG, develop=True)
+    robot.set_proxy('socks5://127.0.0.1:7070')
+    robot.open('https://twitter.com')
+
+    #Login
+    robot.type(USERNAME,'id=signin-email')
+    robot.type(PASSWORD,'id=signin-password')
+    robot.click("xpath=//td/button[contains(text(),'Sign in')]",expect_loading=True)
+
+    #Post a twitter
+    robot.click("id=tweet-box-mini-home-profile")
+    robot.type("GRobot is too powerful.https://github.com/DYFeng/GRobot",selector="id=tweet-box-mini-home-profile")
+    robot.click("xpath=//div[@class='module mini-profile']//button[text()='Tweet']")
+
+    #Wait for post success
+    robot.wait_for_text('Your Tweet was posted')
+
+    # Wait forever.
+    robot.wait_for(lambda: False, time_for_stop=-1)
+
+if __name__ == '__main__':
+    gevent.spawn(main).join()
+
+```
+
+
+###Browsing Google.com and find GRobot project with selenium###
+
+```python
+import gevent
+import logging
+from grobot import GRobot
+
 def main():
 
     # Show the browser window.Open the webkit inspector.
-    robot = GRobot(display=True, develop=True, log_level=logging.DEBUG, loading_timeout=10, operate_timeout=10)
+    robot = GRobot(display=True, develop=False, log_level=logging.DEBUG, loading_timeout=10, operate_timeout=10)
 
     # In China,people can only using proxy to access google.
     robot.set_proxy('socks5://127.0.0.1:7070')
@@ -189,15 +248,7 @@ def main():
     #Open google
     robot.open('http://www.google.com/')
 
-    # Filter the google logo file
-    pattern = re.compile(r"^.*logo.*\.(png|gif)$")
 
-    # Found the logo image.
-    logo = filter_resources(pattern, resources)[0].content
-
-    # Save the logo.
-    with open('/tmp/google_log.png', 'wb') as f:
-        f.write(logo)
 
     #Type out project and search.
     robot.seleniumChain([
@@ -227,13 +278,8 @@ if __name__ == '__main__':
     gevent.spawn(main).join()
 ```
 
-#Known Issues#
---------------
-- I never plan to support windows.If it works well on windows,that's great.If it not,please help yourselvers.
-- It does not support PySide.For now,PySide is still under develop.It lacked some methods.
-- You can't get back the conent from cache.Ghost.py can do this.But I don't think it's reliable.
 
-    
+
 
 
 
