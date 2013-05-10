@@ -1,6 +1,8 @@
 GRobot  [![Build Status](https://travis-ci.org/DYFeng/GRobot.png)](https://travis-ci.org/DYFeng/GRobot)
 ======
 
+*GRobot is still under development and I love to refactor.So,control your risks.*
+
 GRobot is a powerful web robot based on gevent and selenium.
 This project comes from [Ghost.py](http://jeanphix.me/Ghost.py),which I have rewrote most of the code inside, and changed its name to GRobot.
 
@@ -11,8 +13,8 @@ robot.open("http://www.yahoo.com")
 assert 'yahoo' in robot.content
 ```
 
-#What it can and can't do#
---------------------------
+What it can and can't do
+==========================
 
 ##Can do##
 
@@ -32,8 +34,8 @@ assert 'yahoo' in robot.content
 
 
 
-#Installation#
--------------
+Installation
+==============
 
 First you need to install [PyQt](http://www.riverbankcomputing.co.uk/software/pyqt/intro).
 
@@ -53,8 +55,9 @@ Install GRobot using pip.
 
     pip install GRobot
 
-#How to use#
-------------
+How to use
+============
+
 ##Quick start##
 
 First of all, you need a instance of GRobot in greenlet:
@@ -152,11 +155,11 @@ Selenium can't access the `<input type='file'/>` tag.You can't use selenium to s
 Selenium is powerful,but it can't work everythere.You may want to use some native tool.
 Not like selenium,the native tool will control your system mouse and keyboard.
 
-##Click##
+###Click###
 
     robot.click('id=submit_it')
 
-##Type Text##
+###Type Text###
 
 Typing text word by word.
 
@@ -190,7 +193,8 @@ That wait until the given text exists inside the frame.
     result = robot.wait_for_text("My result")
 
 
-##Sample use case##
+Sample use case
+===============
 
 ###Post a twitter with native tool###
 
