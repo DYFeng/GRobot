@@ -151,8 +151,8 @@ Selenium can't access the `<input type='file'/>` tag.You can't use selenium to s
     robot.set_file_input('id=file-upload', '/tmp/file')
 
 
-##Play without selenium##
-Selenium is powerful,but it can't work everythere.You may want to use some native tool.
+##Play with native tools##
+Selenium is powerful,but it can't work everythere.You may want to use some native tools.
 Not like selenium,the native tool will control your system mouse and keyboard.
 
 ###Click###
