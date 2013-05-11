@@ -3,6 +3,7 @@ python:
   - "2.7"
 virtualenv:
   system_site_packages: true
+
 install:
   - sudo apt-get update
   - sudo apt-get install python-qt4

@@ -16,6 +16,8 @@ import subprocess
 import tempfile
 from cookielib import Cookie, LWPCookieJar
 
+import lxml.html as HTML
+
 import sip
 
 sip.setapi(u'QVariant', 2)
@@ -38,122 +40,9 @@ logging.basicConfig(level=logging.DEBUG,
 
 logger = logging.getLogger('GRobot')
 
-import lxml.html as HTML
-
-
-class XPath(object):
-    def __init__(self, content=None):
-        if content is not None:
-            if isinstance(content, HTML.HtmlElement):
-                self.__parser_content = content
-            else:
-                self.compile(content)
-
-    def compile(self, content):
-        self.__parser_content = HTML.document_fromstring(content)
-
-    def execute(self, *arg, **kwargs):
-        try:
-            return map(lambda x: unicode(x) if isinstance(x, basestring) else x,
-                       self.__parser_content.xpath(*arg, **kwargs))
-        except:
-            return None
-
+default_user_agent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:20.0) Gecko/20100101 Firefox/20.0"
 
 _pattern_type = type(re.compile("", 0))
-
-
-class GRobotNetworkAccessManager(QNetworkAccessManager):
-    def __init__(self, parent=None):
-        super(GRobotNetworkAccessManager, self).__init__(parent)
-
-    def createRequest(self, op, req, outgoingData=None):
-        req.setRawHeader('Accept-Language', 'en,*')
-        return super(GRobotNetworkAccessManager, self).createRequest(op, req, outgoingData)
-
-
-class GRobotWebPage(QtWebKit.QWebPage):
-    """Overrides QtWebKit.QWebPage in order to intercept some graphical
-    behaviours like alert(), confirm().
-    Also intercepts client side console.log().
-    """
-
-    def __init__(self, robot, parent=None):
-
-        super(GRobotWebPage, self).__init__(parent)
-        self._robot = robot
-        self.setNetworkAccessManager(GRobotNetworkAccessManager(self))
-
-    def javaScriptConsoleMessage(self, message, line, source):
-        """Prints client console message in current output stream."""
-
-        super(GRobotWebPage, self).javaScriptConsoleMessage(message, line,
-                                                            source)
-        log_type = "error" if "Error" in message else "info"
-        getattr(logger, log_type)("%s(%d): %s" % (source or '<unknown>', line, message))
-
-
-    #TODO:Need more time to test these.
-    def chooseFile(self, frame, suggested_file=None):
-        if self._robot._upload_file and os.path.isfile(self._robot._upload_file):
-            return self._robot._upload_file
-        else:
-            logger.error('upload file %s is not exist.' % self._robot._upload_file)
-
-    def javaScriptAlert(self, frame, message):
-        """Notifies GRobot for alert, then pass."""
-        self._robot._alert = message
-        self._robot.popup_messages = message
-        logger.debug("alert('%s')" % message)
-
-    def javaScriptConfirm(self, frame, message):
-        """Checks if GRobot is waiting for confirm, then returns the right
-        value.
-        """
-        if self._robot._confirm_expected is None:
-            raise Exception('You must specified a value to confirm "%s"' %
-                            message)
-        confirmation, callback = self._robot._confirm_expected
-        logger.debug("confirm('%s')" % message)
-        self._robot._confirm_expected = None
-        self._robot.popup_messages = message
-
-        if callback is not None:
-            return callback()
-        return confirmation
-
-    def javaScriptPrompt(self, frame, message, defaultValue, result=None):
-        """Checks if GRobot is waiting for prompt, then enters the right
-        value.
-        """
-        if self._robot._prompt_expected is None:
-            raise Exception('You must specified a value for prompt "%s"' %
-                            message)
-
-        result_value, callback, confirm = self._robot._prompt_expected
-        logger.debug("prompt('%s')" % message)
-
-        if callback is not None:
-            result_value = callback()
-
-        if result_value == '':
-            logger.warning("'%s' prompt filled with empty string" % message)
-
-        result.append(result_value)
-
-        self._robot._prompt_expected = None
-        self._robot.popup_messages = message
-
-        return confirm
-
-    def setUserAgent(self, user_agent):
-        self.user_agent = user_agent
-
-    def userAgentForUrl(self, url):
-        return self.user_agent
-
-
-default_user_agent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:20.0) Gecko/20100101 Firefox/20.0"
 
 
 def can_load_page(func):
@@ -218,6 +107,115 @@ def singleton(class_):
     return class_w
 
 
+class XPath(object):
+    def __init__(self, content=None):
+        if content is not None:
+            if isinstance(content, HTML.HtmlElement):
+                self.__parser_content = content
+            else:
+                self.compile(content)
+
+    def compile(self, content):
+        self.__parser_content = HTML.document_fromstring(content)
+
+    def execute(self, *arg, **kwargs):
+        try:
+            return map(lambda x: unicode(x) if isinstance(x, basestring) else x,
+                       self.__parser_content.xpath(*arg, **kwargs))
+        except Exception:
+            return None
+
+
+class GRobotNetworkAccessManager(QNetworkAccessManager):
+    def __init__(self, parent=None):
+        super(GRobotNetworkAccessManager, self).__init__(parent)
+
+    def createRequest(self, op, req, outgoingData=None):
+        req.setRawHeader('Accept-Language', 'en,*')
+        return super(GRobotNetworkAccessManager, self).createRequest(op, req, outgoingData)
+
+
+class GRobotWebPage(QtWebKit.QWebPage):
+    """Overrides QtWebKit.QWebPage in order to intercept some graphical
+    behaviours like alert(), confirm().
+    Also intercepts client side console.log().
+    """
+
+    def __init__(self, robot, parent=None):
+        super(GRobotWebPage, self).__init__(parent)
+        self._robot = robot
+        self.setNetworkAccessManager(GRobotNetworkAccessManager(self))
+
+    def javaScriptConsoleMessage(self, message, line, source):
+        """Prints client console message in current output stream."""
+
+        super(GRobotWebPage, self).javaScriptConsoleMessage(message, line,
+                                                            source)
+        log_type = "error" if "Error" in message else "info"
+        getattr(logger, log_type)("%s(%d): %s" % (source or '<unknown>', line, message))
+
+    def chooseFile(self, frame, suggested_file=None):
+        if self._robot._upload_file and os.path.isfile(self._robot._upload_file):
+            return self._robot._upload_file
+        else:
+            logger.error('upload file %s is not exist.' % self._robot._upload_file)
+
+    def javaScriptAlert(self, frame, message):
+        """Notifies GRobot for alert, then pass."""
+
+        self._robot._alert = message
+        self._robot.popup_messages = message
+        logger.debug("alert('%s')" % message)
+
+    def javaScriptConfirm(self, frame, message):
+        """Checks if GRobot is waiting for confirm, then returns the right
+        value.
+        """
+
+        if self._robot._confirm_expected is None:
+            raise Exception('You must specified a value to confirm "%s"' %
+                            message)
+        confirmation, callback = self._robot._confirm_expected
+        logger.debug("confirm('%s')" % message)
+        self._robot._confirm_expected = None
+        self._robot.popup_messages = message
+
+        if callback is not None:
+            return callback()
+        return confirmation
+
+    def javaScriptPrompt(self, frame, message, defaultValue, result=None):
+        """Checks if GRobot is waiting for prompt, then enters the right
+        value.
+        """
+
+        if self._robot._prompt_expected is None:
+            raise Exception('You must specified a value for prompt "%s"' %
+                            message)
+
+        result_value, callback, confirm = self._robot._prompt_expected
+        logger.debug("prompt('%s')" % message)
+
+        if callback is not None:
+            result_value = callback()
+
+        if result_value == '':
+            logger.warning("'%s' prompt filled with empty string" % message)
+
+        result.append(result_value)
+
+        self._robot._prompt_expected = None
+        self._robot.popup_messages = message
+
+        return confirm
+
+    def setUserAgent(self, user_agent):
+        self.user_agent = user_agent
+
+    def userAgentForUrl(self, url):
+        return self.user_agent
+
+
 @singleton
 class QtMainLoop(object):
     """The Qt main loop thread.Singleton pattern.
@@ -273,9 +271,9 @@ class HttpResource(object):
         self.content = content
         if self.content is None:
             # Tries to get back content from cache
-            buffer = cache.data(self.url)
-            if buffer is not None:
-                content = buffer.readAll()
+            _buffer = cache.data(self.url)
+            if _buffer is not None:
+                content = _buffer.readAll()
                 try:
                     self.content = unicode(content)
                 except UnicodeDecodeError:
@@ -619,72 +617,102 @@ class GRobot(object):
             QNetworkProxyFactory.setUseSystemConfiguration(True)
 
 
-    def get_postions_from_selector(self, selector):
-        if selector.startswith('xpath='):
-            query = selector[6:]
-            postions = self.evaluate(u"""
+    class TargetSelector(object):
+
+        def __init__(self, robot, expression):
+            self._robot = robot
+            key, pattern, param = self.parser_expression(expression)
+
+            self.eq = getattr(self, pattern)(param)
+
+
+        def __eq__(self, other):
+            return self.eq(other)
+
+        def string(self, param):
+            self._string = param
+            return lambda other: self._string == other
+
+        def id(self):
+            pass
+
+
+    def first_element_position(self, selector):
+        try:
+            return self.elements_position(selector)[0]
+        except IndexError:
+            logger.warning("Can't locate selector " + selector)
+            return None
+
+
+    def elements_position(self, selector):
+        attr, pattern, value = self.parser_selector(selector)
+
+        strip = lambda v: v.strip()
+
+        if pattern:
+            value = locals()[pattern](value)
+
+
+        def id(query):
+            return self.elements_position('css=#' + query)
+
+        def link(query):
+            return self.elements_position("xpath=//a[@text()='%s']" + query)
+
+        def css(query):
+            # def qpoint_to_tuple(point):
+            #     return point.x(), point.y()
+            result = []
+            for ele in self.main_frame.findAllElements(query):
+                if not ele.isNull():
+                    result.append(ele.geometry().center())
+            return result
+            # return self.main_frame.findAllElements(query)
+
+        def xpath(query):
+            positions = self.evaluate(u"""
             function GetAbsoluteLocationEx(element)
-{
-    if ( arguments.length != 1 || element == null )
-    {
-        return null;
-    }
-    var elmt = element;
-    var offsetTop = elmt.offsetTop;
-    var offsetLeft = elmt.offsetLeft;
-    var offsetWidth = elmt.offsetWidth;
-    var offsetHeight = elmt.offsetHeight;
-    while( elmt = elmt.offsetParent )
-    {
-          // add this judge
-        if ( elmt.style.position == 'absolute' || elmt.style.position == 'relative'
-            || ( elmt.style.overflow != 'visible' && elmt.style.overflow != '' ) )
-        {
-            break;
-        }
-        offsetTop += elmt.offsetTop;
-        offsetLeft += elmt.offsetLeft;
-    }
-    return { absoluteTop: offsetTop, absoluteLeft: offsetLeft,
-        offsetWidth: offsetWidth, offsetHeight: offsetHeight };
-}
-
-
-                result=[];
-                for (var r = document.evaluate('%s', document, null, 5, null), n; n = r.iterateNext();) {
-                //result.push([n.scrollLeft+n.offsetWidth/2.0,n.scrollTop+n.offsetHeight/2.0]);
-                pos=GetAbsoluteLocationEx(n)
-                pos
-                result.push([pos.absoluteLeft+pos.offsetWidth/2.0,pos.absoluteTop+pos.offsetHeight/2.0]);
+            {
+                if ( arguments.length != 1 || element == null )
+                {
+                    return null;
                 }
-                result
+                var elmt = element;
+                var offsetTop = elmt.offsetTop;
+                var offsetLeft = elmt.offsetLeft;
+                var offsetWidth = elmt.offsetWidth;
+                var offsetHeight = elmt.offsetHeight;
+                while( elmt = elmt.offsetParent )
+                {
+                      // add this judge
+                    if ( elmt.style.position == 'absolute' || elmt.style.position == 'relative'
+                        || ( elmt.style.overflow != 'visible' && elmt.style.overflow != '' ) )
+                    {
+                        break;
+                    }
+                    offsetTop += elmt.offsetTop;
+                    offsetLeft += elmt.offsetLeft;
+                }
+                return { absoluteTop: offsetTop, absoluteLeft: offsetLeft,
+                    offsetWidth: offsetWidth, offsetHeight: offsetHeight };
+            }
+            result=[];
+            for (var r = document.evaluate('%s', document, null, 5, null), n; n = r.iterateNext();) {
+            pos=GetAbsoluteLocationEx(n)
+            result.push([pos.absoluteLeft+pos.offsetWidth/2.0,pos.absoluteTop+pos.offsetHeight/2.0]);
+            }
+            result
             """ % query.replace("\'", "\\'"))
-            return map(lambda x: tuple(x), postions)
-        elif selector.startswith('css='):
-            query = selector[4:]
 
-            def qpoint_to_tuple(point):
-                return (point.x(), point.y())
+            return map(lambda x: QPoint(*tuple(x)), positions)
 
-            return [qpoint_to_tuple(x.geometry().center()) for x in self.main_frame.findAllElements(query)]
-        elif selector.startswith('id='):
-            query = selector[3:]
-            return self.get_postions_from_selector('css=#' + query)
-        elif selector.startswith('link='):
-            query = selector[5:]
-            return self.get_postions_from_selector("xpath=//a[@text()='%s']" + query)
-        elif selector.startswith('dom='):
-            query = selector[4:]
-            raise NotImplementedError
-        else:
-            raise NotImplementedError
+        return locals()[attr](value)
 
 
-    def set_page_center(self, postion):
-        width = self.evaluate("document.documentElement.clientWidth")
-        height = self.evaluate("document.documentElement.clientHeight")
-        self.main_frame.setScrollPosition(QPoint(postion[0] - width / 2.0, postion[1] - height / 2.0))
-
+    def set_page_center(self, qpoint):
+        size = self.page.viewportSize()
+        self.main_frame.setScrollPosition((qpoint - QPoint(size.width(), size.height())) / 2.0)
 
 
     @need_webview
@@ -697,26 +725,53 @@ class GRobot(object):
         self.page.triggerAction('Reload')
         return self.wait_for_page_loaded()
 
-    @need_webview
     def trigger_action(self, action):
+        """Trigger QWebPage::WebAction
+
+        @param action:
+        """
         self.page.triggerAction(getattr(QWebPage, action))
+
+
+    def parser_selector(self, selector,attr=None,pattern=None,val=None):
+
+        index = selector.find('=')
+
+        if index <= 0:
+            val=selector
+        else:
+            attr = selector[:index]
+            value_ = selector[index + 1:]
+            index = value_.find(':')
+
+            if index > 0:
+                pattern = value_[:index]
+
+            val = value_[index + 1:]
+
+        return attr, pattern, val
 
 
     @need_webview
     @can_load_page
-    def click(self, selector):
-        postions = self.get_postions_from_selector(selector)
-        if postions:
-            postion=postions[0]
-            self.set_page_center(postion)
-            pos = QPoint(
-                postion[0]-self.main_frame.scrollPosition().x(),
-                postion[1]-self.main_frame.scrollPosition().y(),
-                         )
-            QTest.mouseMove(self.webview, pos=pos, delay=100)
-            QTest.mouseClick(self.webview, Qt.LeftButton, pos=pos, delay=100)
-        else:
-            logger.warning("Can't locate selector " + selector)
+    def click(self, selector, delay=500):
+        qpoint = self.first_element_position(selector)
+        if qpoint:
+            self.click_position(qpoint, delay=delay)
+        gevent.sleep(1)
+
+    @need_webview
+    @can_load_page
+    def click_position(self, qpoint, delay=20):
+        self.set_page_center(qpoint)
+
+        pos = qpoint - self.main_frame.scrollPosition()
+        # pos = QPoint(
+        #     x - self.main_frame.scrollPosition().x(),
+        #     y - self.main_frame.scrollPosition().y(),
+        # )
+        QTest.mouseMove(self.webview, pos=pos, delay=delay)
+        QTest.mouseClick(self.webview, Qt.LeftButton, pos=pos, delay=delay)
 
 
     def type(self, text, selector=None, delay=20):
@@ -725,15 +780,83 @@ class GRobot(object):
         QTest.keyClicks(self.webview, text, delay=delay)
 
 
+    def first_element(self, selector):
+        position = self.first_element_position(selector)
+        if position:
+            return self.main_frame.hitTestContent(position).element(), position
 
 
+    @need_webview
+    def check(self, selector, checked=True):
+        ele, position = self.first_element(selector)
+        if ele and ele.tagName() == 'INPUT':
+            if ele.attribute('type') in ['checkbox', 'radio']:
+                ele_checked = ele.attribute('checked') == 'checked' or False
+                if ele_checked != checked:
+                    self.click_position(position)
+            else:
+                raise ValueError, "%s is not a checkbox or radio" % selector
+        gevent.sleep(1)
+
+    # def option_element(self,select,value):
+
+
+
+    def select(self, selector, value,selected=True):
+        ele, position = self.first_element(selector)
+        attr, pattern, val = self.parser_selector(value,attr='text')
+
+        def _select(query,select_by,select):
+            select.evaluateJavaScript(u"""
+            triggerEvent(this, 'focus', false);
+            var changed = false;
+            var optionToSelect = '%s';
+            for (var i = 0; i < this.options.length; i++) {
+                var option = this.options[i];
+                if (option.selected && option.%s != optionToSelect) {
+                    option.selected = false;
+                    changed = true;
+                }
+                else if (!option.selected && option.%s == optionToSelect) {
+                    option.selected = true;
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                triggerEvent(this, 'change', true);
+            }
+            """%( query.replace("\'", "\\'"),select_by,select_by))
+
+        def _add_selection(query,select_by,select):
+            select.evaluateJavaScript(u"""
+            triggerEvent(this, 'focus', false);
+            var optionToSelect = '%s';
+            for (var i = 0; i < this.options.length; i++) {
+                var option = this.options[i];
+                if (option.%s == optionToSelect)
+                {
+                    option.selected = %s;
+                    triggerEvent(this, 'change', true);
+                }
+
+            }
+            """%( query.replace("\'", "\\'"),select_by,selected and 'true' or 'false'))
+
+
+        if ele and ele.tagName() == 'SELECT':
+            ele.setFocus()
+            if ele.attribute('multiple') == 'multiple':
+                _add_selection(val,attr,ele)
+            else:
+                # self.click_position(position)
+                _select(val,attr,ele)
+        gevent.sleep(1)
+
+    @need_webview
     def set_file_input(self, selector, file):
-
         self._upload_file = file
-
-        # for ele in self.main_frame.findAllElements(selector):
         self.click(selector)
-
         self._upload_file = None
 
 
@@ -776,7 +899,6 @@ class GRobot(object):
                 result.append(filepath)
 
         return result
-
 
     def capture_to_buf(self, selector=None):
         """capture the images of selector to StringIO
@@ -874,8 +996,7 @@ class GRobot(object):
         self.evaluate(codecs.open(path, encoding=encoding).read())
 
     def __del__(self):
-        """
-        Depend on the CG of Python.
+        """Depend on the CG of Python.
         """
         self._exit()
 
@@ -1074,19 +1195,6 @@ class GRobot(object):
         return self.wait_for(lambda: self.loaded,
                              'Unable to load requested page', time_for_stop=time_for_stop)
 
-        # resources = self._release_last_resources()
-
-        # page = None
-        # url = str(self.main_frame.url().toString().toUtf8())
-        # url_without_hash = url.split("#")[0]
-
-        # print self.http_resources
-        #
-        # page=self.filter_resources(url) or self.filter_resources(url_without_hash)
-        #
-        #
-        # return page[0]
-
     def wait_for(self, condition, timeout_message='', time_for_stop=None):
         """Waits until condition is True.
 
@@ -1152,13 +1260,10 @@ class GRobot(object):
                             'xmlextras.js', ]
 
         for script in selenium_scripts:
-            # js_file = open(os.path.dirname(__file__) + '/../selenium-scripts/' + script).read()
-            # self.main_frame.evaluateJavaScript(js_file)
             self.evaluate_js_file(os.path.dirname(__file__) + '/../selenium-scripts/' + script)
 
         self.evaluate(
             """
-
             selenium=Selenium.createForWindow(window);
             GCrawlerFactory = new CommandHandlerFactory();
             GCrawlerFactory.registerAll(selenium);
@@ -1211,13 +1316,9 @@ class GRobot(object):
 
     def _link_clicked(self, href):
         """Contorl the page link clicked event,forbid open new window.
+
         @param href: The href attribute of a tag.
         """
-        # href_string = href.toString()
-
-        #is a real link?It must be a real link.
-        # if not href_string.startsWith('#') and not href_string.startsWith('jacascript:'):
-        #     self.main_frame.load(QUrl(href_string))
 
         self.main_frame.load(href)
 
@@ -1226,6 +1327,7 @@ class GRobot(object):
 
         @param reply: The QNetworkReply object.
         """
+
         if reply.attribute(QNetworkRequest.HttpStatusCodeAttribute):
             self.http_resources.append(HttpResource(reply, self.cache))
 
@@ -1242,11 +1344,16 @@ class GRobot(object):
             self._auth_attempt += 1
 
     def _on_manager_ssl_errors(self, reply, errors):
+        """Ingore all the ssl error
+
+        @param reply:
+        @param errors:
+        """
         url = unicode(reply.url().toString())
         if self.ignore_ssl_errors:
             reply.ignoreSslErrors()
         else:
-            logger.log('SSL certificate error: %s' % url, level='warning')
+            logger.warning('SSL certificate error: %s' % url)
 
 
     def _exit(self):
@@ -1263,10 +1370,7 @@ class GRobot(object):
             sip.delete(self.webview)
 
         if self.page and not sip.isdeleted(self.page):
-            # self.page.deleteLater()
             sip.delete(self.page)
-            # sip.delete(self.main_frame)
-            # sip.delete(self.cache)
 
         GRobot._liveRobot -= 1
 
