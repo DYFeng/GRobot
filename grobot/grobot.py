@@ -24,14 +24,16 @@ sip.setapi(u'QVariant', 2)
 
 from PyQt4.Qt import Qt
 from PyQt4.QtTest import QTest
+
+
 from PyQt4 import QtWebKit
 from PyQt4.QtNetwork import QNetworkRequest, QNetworkAccessManager, QNetworkProxy, \
     QNetworkCookieJar, QNetworkDiskCache, QNetworkProxyFactory, QNetworkCookie
 from PyQt4.QtWebKit import QWebSettings, QWebPage, QWebView, QWebInspector
 from PyQt4.QtCore import QSize, QByteArray, QUrl, QDateTime, \
-    QtCriticalMsg, QtDebugMsg, QtFatalMsg, QtWarningMsg, QPoint
+    QtCriticalMsg, QtDebugMsg, QtFatalMsg, QtWarningMsg, QPoint,QEvent
 
-from PyQt4.QtGui import QApplication, QImage, QPainter
+from PyQt4.QtGui import QApplication, QImage, QPainter,QMouseEvent
 
 
 logging.basicConfig(level=logging.DEBUG,
@@ -80,6 +82,7 @@ def need_webview(func):
             self.webview = self.webview or QtWebKit.QWebView()
             self.webview.setPage(self.page)
             self.webview.hide()
+            self.set_viewport_size(*self.viewport_size)
         return func(self, *args, **kwargs)
 
     return wrapper
@@ -464,6 +467,9 @@ class GRobot(object):
 
         self.webview = None
 
+        self.viewport_size=viewport_size
+
+
         if self.display:
             self.webview = QtWebKit.QWebView()
             self.webview.setPage(self.page)
@@ -646,19 +652,25 @@ class GRobot(object):
 
 
     def elements_position(self, selector):
-        attr, pattern, value = self.parser_selector(selector)
+        attr, pattern, val = self.parser_selector(selector,attr='identifier')
 
         strip = lambda v: v.strip()
 
         if pattern:
-            value = locals()[pattern](value)
+            val = locals()[pattern](val)
 
+
+        def identifier(query):
+            return id(query) or name(query)
+
+        def name(query):
+            return css("*[name='%s']"%query)
 
         def id(query):
-            return self.elements_position('css=#' + query)
+            return css('#' + query)
 
         def link(query):
-            return self.elements_position("xpath=//a[@text()='%s']" + query)
+            return xpath("//a[@text()='%s']" + query)
 
         def css(query):
             # def qpoint_to_tuple(point):
@@ -707,7 +719,7 @@ class GRobot(object):
 
             return map(lambda x: QPoint(*tuple(x)), positions)
 
-        return locals()[attr](value)
+        return locals()[attr](val)
 
 
     def set_page_center(self, qpoint):
@@ -752,39 +764,54 @@ class GRobot(object):
         return attr, pattern, val
 
 
+
+
     @need_webview
     @can_load_page
     def click(self, selector, delay=500):
         qpoint = self.first_element_position(selector)
         if qpoint:
-            self.click_position(qpoint, delay=delay)
-        gevent.sleep(1)
+            return self.click_position(qpoint, delay=delay)
 
     @need_webview
     @can_load_page
-    def click_position(self, qpoint, delay=20):
+    def click_position(self, qpoint, delay=200):
         self.set_page_center(qpoint)
-
+        self.webview.repaint()
         pos = qpoint - self.main_frame.scrollPosition()
-        # pos = QPoint(
-        #     x - self.main_frame.scrollPosition().x(),
-        #     y - self.main_frame.scrollPosition().y(),
-        # )
+
         QTest.mouseMove(self.webview, pos=pos, delay=delay)
         QTest.mouseClick(self.webview, Qt.LeftButton, pos=pos, delay=delay)
+        gevent.sleep(1)
+        return pos
 
-
-    def type(self, text, selector=None, delay=20):
+    @need_webview
+    def send_keys(self, selector, text, delay=20):
         if selector:
             self.click(selector)
         QTest.keyClicks(self.webview, text, delay=delay)
 
 
+    def type(self,selector,text):
+        position=self.click(selector)
+
+        ele=self.get_element_from_postion(position)
+
+        ele.evaluateJavaScript(
+            u"""
+            core.events.setValue(this, '%s')
+            """%(text.replace("\n", "\\n").replace("\'", "\\'"))
+
+        )
+
+
+    def get_element_from_postion(self,position):
+        return self.main_frame.hitTestContent(position).element()
+
     def first_element(self, selector):
         position = self.first_element_position(selector)
         if position:
             return self.main_frame.hitTestContent(position).element(), position
-
 
     @need_webview
     def check(self, selector, checked=True):
@@ -796,10 +823,6 @@ class GRobot(object):
                     self.click_position(position)
             else:
                 raise ValueError, "%s is not a checkbox or radio" % selector
-        gevent.sleep(1)
-
-    # def option_element(self,select,value):
-
 
 
     def select(self, selector, value,selected=True):
@@ -851,7 +874,6 @@ class GRobot(object):
             else:
                 # self.click_position(position)
                 _select(val,attr,ele)
-        gevent.sleep(1)
 
     @need_webview
     def set_file_input(self, selector, file):

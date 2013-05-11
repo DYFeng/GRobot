@@ -19,7 +19,7 @@ base_url = 'http://localhost:%s/' % PORT
 
 class GRobotTest(unittest.TestCase):
     port = PORT
-    display = False
+    display = True
     develop = True
     log_level = logging.DEBUG
 
@@ -35,11 +35,11 @@ class GRobotTest(unittest.TestCase):
         cls.server.kill()
 
     def tearDown(self):
-        self.robot = None
+        del self.robot
 
     def setUp(self):
         self.robot = GRobot(
-            display=GRobotGeneralTest.display,
+            # display=GRobotGeneralTest.display,
             develop=GRobotGeneralTest.develop,
             log_level=GRobotGeneralTest.log_level
         )
@@ -214,20 +214,21 @@ class GrobotNativeTest(GRobotTest):
             "radio": "first choice"
         }
 
+
         self.robot.check('id=checkbox',True)
         value = self.robot.evaluate(
             'document.getElementById("checkbox").checked')
         self.assertEqual(value, True)
 
-        # self.robot.check('id=radio-first',True)
-        # value = self.robot.evaluate(
-        #     'document.getElementById("radio-first").checked')
-        # self.assertEqual(value, True)
-        #
-        # self.robot.check('id=radio-second',False)
-        # value = self.robot.evaluate(
-        #     'document.getElementById("radio-second").checked')
-        # self.assertEqual(value, False)
+        self.robot.check('id=radio-first',True)
+        value = self.robot.evaluate(
+            'document.getElementById("radio-first").checked')
+        self.assertEqual(value, True)
+
+        self.robot.check('id=radio-second',False)
+        value = self.robot.evaluate(
+            'document.getElementById("radio-second").checked')
+        self.assertEqual(value, False)
 
         self.robot.select('id=selectbox','value=one')
         value = self.robot.evaluate(
@@ -269,54 +270,11 @@ class GrobotNativeTest(GRobotTest):
         """)
         self.assertEqual(value, ['one','four'])
 
-
-
-class GRobotSeleniumTest(GRobotTest):
-
-
-    def test_fill(self):
-        self.robot.open("%sform" % base_url)
-        values = {
-            'text': 'Here is a sample text.',
-            'email': 'my@awesome.email',
-            'textarea': 'Here is a sample text.\nWith several lines.',
-            'checkbox': True,
-            'selectbox': 'two',
-            "radio": "first choice"
-        }
-
-        self.robot.seleniumChain([
-            ("type", "id=text", 'Here is a sample text.'),
-            ("type", "id=email", 'my@awesome.email'),
-            ("type", "id=textarea", 'Here is a sample text.\nWith several lines.'),
-            ("check", "id=checkbox"),
-            ("select", "id=selectbox", 'label=two'),
-            ("click", "id=radio-first"),
-        ])
-
-        for field in ['text', 'email', 'textarea', 'selectbox']:
-            value = self.robot.evaluate('document.getElementById("%s").value' % field)
-            self.assertEqual(value, values[field])
-        value = self.robot.evaluate(
-            'document.getElementById("checkbox").checked')
-        self.assertEqual(value, True)
-        value = self.robot.evaluate(
-            'document.getElementById("radio-first").checked')
-        self.assertEqual(value, True)
-        value = self.robot.evaluate(
-            'document.getElementById("radio-second").checked')
-        self.assertEqual(value, False)
-
-
-
-
-
     def test_form_submission(self):
         self.robot.open("%sform" % base_url)
 
-        self.robot.seleniumChain([('type', 'id=contact-form', 'Here is a sample text.'),
-                                  ('click', "xpath=//input[@type='submit']"),
-                                 ], expect_loading=True)
+        self.robot.send_keys('textarea','Here is a sample text.')
+        self.robot.click("xpath=//input[@type='submit']", expect_loading=True)
 
         self.assertIn('form successfully posted', self.robot.content)
 
@@ -329,102 +287,102 @@ class GRobotSeleniumTest(GRobotTest):
 
     def test_click_link(self):
         self.robot.open("%s" % base_url)
-        self.robot.selenium('click', 'xpath=//a', expect_loading=True)
+        self.robot.click('xpath=//a', expect_loading=True)
         self.assertEqual(self.robot.url, "%sform" % base_url)
 
 
     def test_wait_for_alert(self):
         self.robot.open("%salert" % base_url)
-        self.robot.selenium('click', 'id=alert-button')
+        self.robot.click('alert-button')
         msg = self.robot.wait_for_alert()
         self.assertEqual(msg, 'this is an alert')
 
     def test_confirm(self):
         self.robot.open("%salert" % base_url)
         with confirm(self.robot):
-            self.robot.selenium('click', 'id=confirm-button')
+            self.robot.click('id=confirm-button')
         msg = self.robot.wait_for_alert()
         self.assertEqual(msg, 'you confirmed!')
-
+    
     def test_no_confirm(self):
         self.robot.open("%salert" % base_url)
         with confirm(self.robot, False):
-            self.robot.selenium('click', 'id=confirm-button')
+            self.robot.click( 'id=confirm-button')
         msg = self.robot.wait_for_alert()
         self.assertEqual(msg, 'you denied!')
-
+    
     def test_confirm_callback(self):
         self.robot.open("%salert" % base_url)
         with confirm(self.robot, callback=lambda: False):
-            self.robot.selenium('click', 'id=confirm-button')
+            self.robot.click( 'id=confirm-button')
         msg = self.robot.wait_for_alert()
         self.assertEqual(msg, 'you denied!')
-
+    
     def test_prompt(self):
         self.robot.open("%salert" % base_url)
         with prompt(self.robot, 'my value'):
-            self.robot.selenium('click', 'id=prompt-button')
+            self.robot.click( 'id=prompt-button')
         value = self.robot.evaluate('promptValue')
         self.assertEqual(value, 'my value')
-
-
+    
+    
     def test_prompt_callback(self):
         self.robot.open("%salert" % base_url)
         with prompt(self.robot, callback=lambda: 'another value'):
-            self.robot.selenium('click', 'id=prompt-button')
+            self.robot.click( 'id=prompt-button')
         value = self.robot.evaluate('promptValue')
         self.assertEqual(value, 'another value')
-
+    
     def test_popup_messages_collection(self):
         self.robot.open("%salert" % base_url)
         def _test():
             self.assertIn('this is a confirm', self.robot.popup_messages)
             return True
         with confirm(self.robot, True, callback=_test):
-            self.robot.selenium('click', 'id=confirm-button')
-
+            self.robot.click( 'id=confirm-button')
+    
         self.robot.wait_for_alert()
-
+    
         with prompt(self.robot, confirm=False):
-            self.robot.selenium('click', 'id=prompt-button')
-
+            self.robot.click( 'id=prompt-button')
+    
         self.assertIn('Prompt ?', self.robot.popup_messages)
-
-        self.robot.selenium('click', 'id=alert-button')
-
+    
+        self.robot.click( 'id=alert-button')
+    
         self.assertIn('this is an alert', self.robot.popup_messages)
-
+    
     def test_prompt_default_value_true(self):
         self.robot.open("%salert" % base_url, default_popup_response=True)
-        self.robot.selenium('click', 'id=confirm-button')
+        self.robot.click( 'id=confirm-button')
         msg = self.robot.wait_for_alert()
         self.assertEqual(msg, 'you confirmed!')
-
+    
     def test_prompt_default_value_false(self):
         self.robot.open("%salert" % base_url, default_popup_response=False)
-        self.robot.selenium('click', 'id=confirm-button')
+        self.robot.click( 'id=confirm-button')
         msg = self.robot.wait_for_alert()
         self.assertEqual(msg, 'you denied!')
-
-
-
-
+    
+    
+    
+    
     def test_set_field_value_checkbox_true(self):
         self.robot.open("%sform" % base_url)
         self.robot.selenium('check', 'id=checkbox')
         value = self.robot.evaluate(
             'document.getElementById("checkbox").checked')
         self.assertEqual(value, True)
-
-
+    
+    
     def test_set_field_value_checkbox_false(self):
         self.robot.open("%sform" % base_url)
         self.robot.selenium('uncheck', 'id=checkbox')
         value = self.robot.evaluate(
             'document.getElementById("checkbox").checked')
         self.assertEqual(value, False)
-
-
+    
+    
     def test_set_field_value_checkbox_multiple(self):
         self.robot.open("%sform" % base_url)
         self.robot.selenium('check',
@@ -435,49 +393,49 @@ class GRobotSeleniumTest(GRobotTest):
         value = self.robot.evaluate(
             'document.getElementById("multiple-checkbox-second").checked')
         self.assertEqual(value, True)
-
-
+    
+    
     def test_set_field_value_email(self):
         expected = 'my@awesome.email'
         self.robot.open("%sform" % base_url)
         self.robot.selenium('type', 'id=email', expected)
         value = self.robot.evaluate('document.getElementById("email").value')
         self.assertEqual(value, expected)
-
-
+    
+    
     def test_set_field_value_text(self):
         expected = 'sample text'
         self.robot.open("%sform" % base_url)
         self.robot.selenium('type', 'name=text', expected)
         value = self.robot.evaluate('document.getElementById("text").value')
         self.assertEqual(value, expected)
-
-
+    
+    
     def test_set_field_value_radio(self):
         self.robot.open("%sform" % base_url)
-        self.robot.selenium('click', 'id=radio-first')
+        self.robot.click( 'id=radio-first')
         value = self.robot.evaluate(
             'document.getElementById("radio-first").checked')
         self.assertEqual(value, True)
         value = self.robot.evaluate(
             'document.getElementById("radio-second").checked')
         self.assertEqual(value, False)
-
-
+    
+    
     def test_set_field_value_textarea(self):
-        expected = 'sample text\nanother line'
+        expected = u"sample text\n'another line\n这是一个好项目"
         self.robot.open("%sform" % base_url)
-        self.robot.selenium('type', 'name=textarea', expected)
+        self.robot.type( 'name=textarea', expected)
         value = self.robot.evaluate('document.getElementById("textarea").value')
         self.assertEqual(value, expected)
-
-
+    
+    
     def test_set_simple_file_field(self):
         self.robot.open("%supload" % base_url)
         self.robot.set_file_input('id=simple-file', os.path.dirname(__file__) + '/static/blackhat.jpg')
-        self.robot.selenium('click', "xpath=//input[@type='submit']"
+        self.robot.click( "xpath=//input[@type='submit']"
             , expect_loading=True)
-
+    
         file_path = os.path.join(
             os.path.dirname(__file__), 'uploaded_blackhat.jpg')
         self.assertTrue(os.path.isfile(file_path))
