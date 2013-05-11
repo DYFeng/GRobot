@@ -150,14 +150,14 @@ class GRobotGeneralTest(GRobotTest):
 
     def test_wait_for_selector(self):
         self.robot.open("%smootools" % base_url)
-        self.robot.selenium("click", "id=button")
+        self.robot.click( "id=button")
         self.robot.wait_for_selector("#list li:nth-child(2)")
 
         self.assertEqual(self.robot.http_resources[-1].url, "%sitems.json" % base_url)
 
     def test_wait_for_text(self):
         self.robot.open("%smootools" % base_url)
-        self.robot.selenium("click", "id=button")
+        self.robot.click( "id=button")
         self.robot.wait_for_text("second item")
         self.assertEqual(self.robot.http_resources[-1].url, "%sitems.json" % base_url)
 
@@ -192,7 +192,7 @@ class GrobotNativeTest(GRobotTest):
     # def test_postion(self):
     #     self.robot.open(base_url)
     #
-    #     self.robot.set_page_center(1000,1000)
+    #     self.robot._move_page_center_to(1000,1000)
     #     # print self.robot.postions_from_selector("xpath=//div[@id='middle']")
     #     gevent.sleep(100000000)
 
@@ -235,7 +235,7 @@ class GrobotNativeTest(GRobotTest):
             'document.getElementById("selectbox").value')
         self.assertEqual(value, 'one')
 
-        self.robot.select('id=selectbox','Two')
+        self.robot.select('id=selectbox','text=Two')
         value = self.robot.evaluate(
             'document.getElementById("selectbox").value')
         self.assertEqual(value, 'two')
@@ -245,9 +245,11 @@ class GrobotNativeTest(GRobotTest):
             'document.getElementById("long_selectbox").value')
         self.assertEqual(value, '30')
 
-        self.robot.select('id=multiple_selectbox','one')
-        self.robot.select('id=multiple_selectbox','four')
-        self.robot.select('id=multiple_selectbox','three',False)
+        self.robot.select('id=multiple_selectbox',[
+            ('one',True),
+            ('four',True),
+            ('three',False),
+        ])
 
         value = self.robot.evaluate(
         """
@@ -273,7 +275,7 @@ class GrobotNativeTest(GRobotTest):
     def test_form_submission(self):
         self.robot.open("%sform" % base_url)
 
-        self.robot.send_keys('textarea','Here is a sample text.')
+        self.robot.key_clicks('textarea','Here is a sample text.')
         self.robot.click("xpath=//input[@type='submit']", expect_loading=True)
 
         self.assertIn('form successfully posted', self.robot.content)
@@ -369,7 +371,7 @@ class GrobotNativeTest(GRobotTest):
     
     def test_set_field_value_checkbox_true(self):
         self.robot.open("%sform" % base_url)
-        self.robot.selenium('check', 'id=checkbox')
+        self.robot.check( 'id=checkbox')
         value = self.robot.evaluate(
             'document.getElementById("checkbox").checked')
         self.assertEqual(value, True)
@@ -377,7 +379,7 @@ class GrobotNativeTest(GRobotTest):
     
     def test_set_field_value_checkbox_false(self):
         self.robot.open("%sform" % base_url)
-        self.robot.selenium('uncheck', 'id=checkbox')
+        self.robot.check('id=checkbox',False)
         value = self.robot.evaluate(
             'document.getElementById("checkbox").checked')
         self.assertEqual(value, False)
@@ -385,8 +387,7 @@ class GrobotNativeTest(GRobotTest):
     
     def test_set_field_value_checkbox_multiple(self):
         self.robot.open("%sform" % base_url)
-        self.robot.selenium('check',
-                            'id=multiple-checkbox-second')
+        self.robot.check('id=multiple-checkbox-second')
         value = self.robot.evaluate(
             'document.getElementById("multiple-checkbox-first").checked')
         self.assertEqual(value, False)
@@ -398,7 +399,7 @@ class GrobotNativeTest(GRobotTest):
     def test_set_field_value_email(self):
         expected = 'my@awesome.email'
         self.robot.open("%sform" % base_url)
-        self.robot.selenium('type', 'id=email', expected)
+        self.robot.type( 'id=email', expected)
         value = self.robot.evaluate('document.getElementById("email").value')
         self.assertEqual(value, expected)
     
@@ -406,7 +407,7 @@ class GrobotNativeTest(GRobotTest):
     def test_set_field_value_text(self):
         expected = 'sample text'
         self.robot.open("%sform" % base_url)
-        self.robot.selenium('type', 'name=text', expected)
+        self.robot.type( 'name=text', expected)
         value = self.robot.evaluate('document.getElementById("text").value')
         self.assertEqual(value, expected)
     
@@ -432,7 +433,7 @@ class GrobotNativeTest(GRobotTest):
     
     def test_set_simple_file_field(self):
         self.robot.open("%supload" % base_url)
-        self.robot.set_file_input('id=simple-file', os.path.dirname(__file__) + '/static/blackhat.jpg')
+        self.robot.choose_file('id=simple-file', os.path.dirname(__file__) + '/static/blackhat.jpg')
         self.robot.click( "xpath=//input[@type='submit']"
             , expect_loading=True)
     

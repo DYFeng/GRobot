@@ -25,15 +25,14 @@ sip.setapi(u'QVariant', 2)
 from PyQt4.Qt import Qt
 from PyQt4.QtTest import QTest
 
-
 from PyQt4 import QtWebKit
 from PyQt4.QtNetwork import QNetworkRequest, QNetworkAccessManager, QNetworkProxy, \
     QNetworkCookieJar, QNetworkDiskCache, QNetworkProxyFactory, QNetworkCookie
 from PyQt4.QtWebKit import QWebSettings, QWebPage, QWebView, QWebInspector
 from PyQt4.QtCore import QSize, QByteArray, QUrl, QDateTime, \
-    QtCriticalMsg, QtDebugMsg, QtFatalMsg, QtWarningMsg, QPoint,QEvent
+    QtCriticalMsg, QtDebugMsg, QtFatalMsg, QtWarningMsg, QPoint, QEvent
 
-from PyQt4.QtGui import QApplication, QImage, QPainter,QMouseEvent
+from PyQt4.QtGui import QApplication, QImage, QPainter, QMouseEvent
 
 
 logging.basicConfig(level=logging.DEBUG,
@@ -69,7 +68,7 @@ def can_load_page(func):
     return wrapper
 
 
-def need_webview(func):
+def have_a_break(func):
     """Decorator that specifies if user can expect page loading from
     this action. If expect_loading is set to True, GRobot will wait
     for page_loaded event.
@@ -78,12 +77,15 @@ def need_webview(func):
 
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        if not self.display:
-            self.webview = self.webview or QtWebKit.QWebView()
-            self.webview.setPage(self.page)
-            self.webview.hide()
-            self.set_viewport_size(*self.viewport_size)
-        return func(self, *args, **kwargs)
+        if 'sleep' in kwargs:
+            interval = kwargs['sleep']
+            del kwargs['sleep']
+        else:
+            sleep=self.sleep
+
+        result=func(self, *args, **kwargs)
+        gevent.sleep(sleep)
+        return result
 
     return wrapper
 
@@ -235,9 +237,9 @@ class QtMainLoop(object):
 
         self._app.exit()
         #TODO:This is very ugry to hard-code terminate time.But I can't find another better way.
-        gevent.sleep(1)
+        # gevent.sleep(1)
         self._stop = True
-        self._greenlet.join(timeout=20)
+        self._greenlet.join(timeout=10)
         self._greenlet = None
         sip.delete(self._app)
 
@@ -256,8 +258,8 @@ class QtMainLoop(object):
                 # GRobot._app.processEvents()
                 while self._app.hasPendingEvents():
                     self._app.processEvents()
-                    gevent.sleep(0)
-                gevent.sleep(1)
+                    # gevent.sleep(0)
+                gevent.sleep(0)
         except Exception, e:
             logger.error(e)
         logger.debug('Goodbye GRobot')
@@ -354,7 +356,7 @@ class GRobot(object):
                  display=False, viewport_size=(1024, 768), accept_language='en,*', ignore_ssl_errors=True,
                  cache_dir=os.path.join(tempfile.gettempdir(), "GRobot"),
                  image_enabled=True, plugins_enabled=False, java_enabled=False, javascript_enabled=True,
-                 plugin_path=None, develop=False, proxy=None):
+                 plugin_path=None, develop=False, proxy=None,sleep=0.5):
         """GRobot manages a QWebPage.
     
         @param user_agent: The default User-Agent header.
@@ -373,6 +375,7 @@ class GRobot(object):
         @param plugin_path: Array with paths to plugin directories (default ['/usr/lib/mozilla/plugins'])
         @param develop: Enable the Webkit Inspector.
         @param proxy: Set a Socks5,HTTP{S} Proxy
+        @param sleep: Sleep `sleep` second,after operate
         """
 
         GRobot.exit_lock.acquire()
@@ -384,6 +387,7 @@ class GRobot(object):
         self.plugin = False
         self.exitLoop = False
         self.set_proxy(proxy)
+        self.sleep=sleep
 
         self.popup_messages = None
 
@@ -467,13 +471,12 @@ class GRobot(object):
 
         self.webview = None
 
-        self.viewport_size=viewport_size
+        self.viewport_size = viewport_size
 
+        self.webview = QtWebKit.QWebView()
+        self.webview.setPage(self.page)
 
-        if self.display:
-            self.webview = QtWebKit.QWebView()
-            self.webview.setPage(self.page)
-            self.webview.show()
+        self.webview.show() if display else self.webview.hide()
 
         self.set_viewport_size(*viewport_size)
 
@@ -622,27 +625,6 @@ class GRobot(object):
         else:
             QNetworkProxyFactory.setUseSystemConfiguration(True)
 
-
-    class TargetSelector(object):
-
-        def __init__(self, robot, expression):
-            self._robot = robot
-            key, pattern, param = self.parser_expression(expression)
-
-            self.eq = getattr(self, pattern)(param)
-
-
-        def __eq__(self, other):
-            return self.eq(other)
-
-        def string(self, param):
-            self._string = param
-            return lambda other: self._string == other
-
-        def id(self):
-            pass
-
-
     def first_element_position(self, selector):
         try:
             return self.elements_position(selector)[0]
@@ -652,7 +634,7 @@ class GRobot(object):
 
 
     def elements_position(self, selector):
-        attr, pattern, val = self.parser_selector(selector,attr='identifier')
+        attr, pattern, val = self.parser_selector(selector, attr='identifier')
 
         strip = lambda v: v.strip()
 
@@ -664,7 +646,7 @@ class GRobot(object):
             return id(query) or name(query)
 
         def name(query):
-            return css("*[name='%s']"%query)
+            return css("*[name='%s']" % query)
 
         def id(query):
             return css('#' + query)
@@ -722,19 +704,18 @@ class GRobot(object):
         return locals()[attr](val)
 
 
-    def set_page_center(self, qpoint):
+    def _move_page_center_to(self, qpoint):
         size = self.page.viewportSize()
-        self.main_frame.setScrollPosition((qpoint - QPoint(size.width(), size.height())) / 2.0)
+        self.main_frame.setScrollPosition(qpoint - QPoint(size.width(), size.height()) / 2)
 
 
-    @need_webview
     def reload(self):
         """Reload page.
 
         @return:
         """
         self.loaded = False
-        self.page.triggerAction('Reload')
+        self.trigger_action('Reload')
         return self.wait_for_page_loaded()
 
     def trigger_action(self, action):
@@ -745,12 +726,11 @@ class GRobot(object):
         self.page.triggerAction(getattr(QWebPage, action))
 
 
-    def parser_selector(self, selector,attr=None,pattern=None,val=None):
-
+    def parser_selector(self, selector, attr=None, pattern=None, val=None):
         index = selector.find('=')
 
         if index <= 0:
-            val=selector
+            val = selector
         else:
             attr = selector[:index]
             value_ = selector[index + 1:]
@@ -764,48 +744,69 @@ class GRobot(object):
         return attr, pattern, val
 
 
-
-
-    @need_webview
     @can_load_page
-    def click(self, selector, delay=500):
+    @have_a_break
+    def click(self, selector):
         qpoint = self.first_element_position(selector)
         if qpoint:
-            return self.click_position(qpoint, delay=delay)
+            return self._click_position(qpoint)
 
-    @need_webview
+
     @can_load_page
-    def click_position(self, qpoint, delay=200):
-        self.set_page_center(qpoint)
+    def _click_position(self, qpoint):
+        self._move_page_center_to(qpoint)
         self.webview.repaint()
         pos = qpoint - self.main_frame.scrollPosition()
 
-        QTest.mouseMove(self.webview, pos=pos, delay=delay)
-        QTest.mouseClick(self.webview, Qt.LeftButton, pos=pos, delay=delay)
+        self._move_to_position(pos)
+        QTest.mouseClick(self.webview, Qt.LeftButton, pos=pos)
         gevent.sleep(1)
         return pos
 
-    @need_webview
-    def send_keys(self, selector, text, delay=20):
+
+    def qpoint_to_tuple(self,qpoint):
+        return qpoint.x(),qpoint.y()
+
+    @have_a_break
+    def move_to(self, selector):
+        qpoint = self.first_element_position(selector)
+        if qpoint:
+            self._move_to_position(qpoint)
+            return qpoint_to_tuple(qpoint)
+
+    def move_at(self, x, y):
+        self._move_to_position(QPoint(x, y))
+
+    def _move_to_position(self, qpoint):
+        QTest.mouseMove(self.webview, pos=qpoint)
+        return qpoint
+
+    @have_a_break
+    def click_at(self, x, y):
+        self._click_position(QPoint(x, y))
+
+    @have_a_break
+    def key_clicks(self, selector, text):
         if selector:
             self.click(selector)
-        QTest.keyClicks(self.webview, text, delay=delay)
+        QTest.keyClicks(self.webview, text,delay=50)
 
+    @have_a_break
+    def type(self, selector, text):
+        position = self.click(selector)
 
-    def type(self,selector,text):
-        position=self.click(selector)
+        ele = self._hit_element_from(position)
 
-        ele=self.get_element_from_postion(position)
-
+        ele.setFocus()
         ele.evaluateJavaScript(
             u"""
             core.events.setValue(this, '%s')
-            """%(text.replace("\n", "\\n").replace("\'", "\\'"))
-
+            """ % (text.replace("\n", "\\n").replace("\'", "\\'"))
         )
+        logger.debug('type %s %s'%(selector,text))
 
 
-    def get_element_from_postion(self,position):
+    def _hit_element_from(self, position):
         return self.main_frame.hitTestContent(position).element()
 
     def first_element(self, selector):
@@ -813,23 +814,25 @@ class GRobot(object):
         if position:
             return self.main_frame.hitTestContent(position).element(), position
 
-    @need_webview
+
+    def wait_forever(self):
+        self.wait_for(lambda :False,time_for_stop=-1)
+
+    @have_a_break
     def check(self, selector, checked=True):
         ele, position = self.first_element(selector)
         if ele and ele.tagName() == 'INPUT':
             if ele.attribute('type') in ['checkbox', 'radio']:
                 ele_checked = ele.attribute('checked') == 'checked' or False
                 if ele_checked != checked:
-                    self.click_position(position)
+                    self._click_position(position)
             else:
                 raise ValueError, "%s is not a checkbox or radio" % selector
 
+    @have_a_break
+    def select(self, selector, value):
 
-    def select(self, selector, value,selected=True):
-        ele, position = self.first_element(selector)
-        attr, pattern, val = self.parser_selector(value,attr='text')
-
-        def _select(query,select_by,select):
+        def _select(query, select_by, select):
             select.evaluateJavaScript(u"""
             triggerEvent(this, 'focus', false);
             var changed = false;
@@ -849,9 +852,9 @@ class GRobot(object):
             if (changed) {
                 triggerEvent(this, 'change', true);
             }
-            """%( query.replace("\'", "\\'"),select_by,select_by))
+            """ % ( query.replace("\'", "\\'"), select_by, select_by))
 
-        def _add_selection(query,select_by,select):
+        def _add_selection(query, select_by, select,selected):
             select.evaluateJavaScript(u"""
             triggerEvent(this, 'focus', false);
             var optionToSelect = '%s';
@@ -864,19 +867,24 @@ class GRobot(object):
                 }
 
             }
-            """%( query.replace("\'", "\\'"),select_by,selected and 'true' or 'false'))
+            """ % ( query.replace("\'", "\\'"), select_by, selected and 'true' or 'false'))
 
+        ele, position = self.first_element(selector)
 
         if ele and ele.tagName() == 'SELECT':
             ele.setFocus()
-            if ele.attribute('multiple') == 'multiple':
-                _add_selection(val,attr,ele)
-            else:
-                # self.click_position(position)
-                _select(val,attr,ele)
 
-    @need_webview
-    def set_file_input(self, selector, file):
+            if ele.attribute('multiple') == 'multiple':
+                assert isinstance(value,list)
+                for value_,selected in value:
+                    attr, pattern, val = self.parser_selector(value_, attr='text')
+                    _add_selection(val, attr, ele,selected)
+            else:
+                attr, pattern, val = self.parser_selector(value, attr='text')
+                _select(val, attr, ele)
+
+
+    def choose_file(self, selector, file):
         self._upload_file = file
         self.click(selector)
         self._upload_file = None
@@ -942,60 +950,6 @@ class GRobot(object):
 
         return result
 
-    @can_load_page
-    def seleniumChain(self, commands, interval=1):
-        """
-
-        @param commands:
-        @param interval:
-        @return: Lastest page and resources.
-        """
-        for command in commands:
-            self.selenium(*command, interval=interval)
-
-    @can_load_page
-    def selenium(self, command, target='', value='', interval=1):
-        """Using the prowerful selenium.
-        You can find more command reference via http://release.seleniumhq.org/selenium-core/1.0.1/reference.html
-
-
-        @param command: The selenium command.
-        @param target:
-        @param value:
-        @param interval:Sleep `interval` seconds after the command.
-        @return:
-        """
-
-        ss = u"do_selenium_command('%s','%s','%s')" % (
-            command.replace("\'", "\\'"), target.replace("\'", "\\'"), value.replace("\'", "\\'").replace("\n", "\\n"),
-        )
-        # ss = u"""var command=new SeleniumCommand('%s','%s','%s', false);
-        #     var handler=GCrawlerFactory.getCommandHandler(command.command);
-        #     if (handler)
-        #     {
-        #         command.target = selenium.preprocessParameter(command.target);
-        #         command.value = selenium.preprocessParameter(command.value);
-        #
-        #         try
-        #         {
-        #             handler.execute(selenium, command);
-        #         }catch(e)
-        #         {
-        #             if (e.isSeleniumError)
-        #                 e.message;
-        #         }
-        #
-        #     }else
-        #     {
-        #         'Do not hava command '+command.command;
-        #     }
-        #     """ % (
-        #     command.replace("\'", "\\'"), target.replace("\'", "\\'"), value.replace("\'", "\\'").replace("\n", "\\n"),
-        # )
-        logger.debug("Command:%s\tTarget:%s\tValue:%s" % (command, target, value))
-        result = self.evaluate(ss)
-        gevent.sleep(interval)
-        return result
 
     @can_load_page
     def evaluate(self, script):
@@ -1268,54 +1222,56 @@ class GRobot(object):
             self.inspector.setPage(self.page)
             self.inspector.show()
 
-        selenium_scripts = ['atoms.js',
-                            'htmlutils.js',
-                            'selenium-logging.js',
-
-                            'find_matching_child.js',
-                            'selenium-api.js',
-                            'selenium-api-override.js',
-
-                            'selenium-browserbot.js',
-                            'selenium-browserdetect.js',
-                            'selenium-commandhandlers.js',
-                            'xmlextras.js', ]
+        selenium_scripts = [
+            'atoms.js',
+            'htmlutils.js',
+            # 'selenium-logging.js',
+            #
+            # 'find_matching_child.js',
+            # 'selenium-api.js',
+            # 'selenium-api-override.js',
+            #
+            # 'selenium-browserbot.js',
+            # 'selenium-browserdetect.js',
+            # 'selenium-commandhandlers.js',
+            # 'xmlextras.js',
+        ]
 
         for script in selenium_scripts:
             self.evaluate_js_file(os.path.dirname(__file__) + '/../selenium-scripts/' + script)
 
-        self.evaluate(
-            """
-            selenium=Selenium.createForWindow(window);
-            GCrawlerFactory = new CommandHandlerFactory();
-            GCrawlerFactory.registerAll(selenium);
-
-            function do_selenium_command(command,target,value)
-            {
-
-                var command=new SeleniumCommand(command,target,value, false);
-                var handler=GCrawlerFactory.getCommandHandler(command.command);
-                if (handler)
-                {
-                    command.target = selenium.preprocessParameter(command.target);
-                    command.value = selenium.preprocessParameter(command.value);
-
-                try
-                {
-                    handler.execute(selenium, command);
-                }catch(e)
-                {
-                    if (e.isSeleniumError)
-                        e.message;
-                }
-
-                }else
-                {
-                    'Do not hava command '+command.command;
-                }
-            }
-
-""")
+#         self.evaluate(
+#             """
+#             selenium=Selenium.createForWindow(window);
+#             GCrawlerFactory = new CommandHandlerFactory();
+#             GCrawlerFactory.registerAll(selenium);
+#
+#             function do_selenium_command(command,target,value)
+#             {
+#
+#                 var command=new SeleniumCommand(command,target,value, false);
+#                 var handler=GCrawlerFactory.getCommandHandler(command.command);
+#                 if (handler)
+#                 {
+#                     command.target = selenium.preprocessParameter(command.target);
+#                     command.value = selenium.preprocessParameter(command.value);
+#
+#                 try
+#                 {
+#                     handler.execute(selenium, command);
+#                 }catch(e)
+#                 {
+#                     if (e.isSeleniumError)
+#                         e.message;
+#                 }
+#
+#                 }else
+#                 {
+#                     'Do not hava command '+command.command;
+#                 }
+#             }
+#
+# """)
 
         self.loaded = True
         # self.cache.clear()
