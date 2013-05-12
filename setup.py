@@ -6,7 +6,7 @@ Powerful Web Robot.
 
 """
 from setuptools import setup, find_packages
-
+from glob import glob
 
 setup(
     name='GRobot',
@@ -22,10 +22,7 @@ setup(
         ],
     data_files=[
         ('grobot', ['README.md','license.txt']),
-        ('javascripts', ['javascripts/atoms.js',
-                              'javascripts/htmlutils.js',
-                              'javascripts/license.txt'
-        ]),
+        ('javascripts',glob('javascripts/*.js') ),
     ],
     packages=find_packages(),
     include_package_data=True,
