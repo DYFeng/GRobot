@@ -214,7 +214,6 @@ class GrobotNativeTest(GRobotTest):
             "radio": "first choice"
         }
 
-
         self.robot.check('id=checkbox',True)
         value = self.robot.evaluate(
             'document.getElementById("checkbox").checked')

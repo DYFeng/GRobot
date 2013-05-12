@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='GRobot',
-    version='0.0.1',
+    version='0.0.2',
     url='https://github.com/DYFeng/GRobot',
     license='MIT',
     author='DY.Feng',
@@ -24,17 +24,8 @@ setup(
         ('grobot', ['README.md','license.txt']),
         ('selenium-scripts', ['selenium-scripts/atoms.js',
                               'selenium-scripts/htmlutils.js',
-                              'selenium-scripts/selenium-logging.js',
-
-                              'selenium-scripts/find_matching_child.js',
-                              'selenium-scripts/selenium-api.js',
-                              'selenium-scripts/selenium-api-override.js',
-
-                              'selenium-scripts/selenium-browserbot.js',
-                              'selenium-scripts/selenium-browserdetect.js',
-                              'selenium-scripts/selenium-commandhandlers.js',
-                              'selenium-scripts/xmlextras.js',
-                              'selenium-scripts/license.txt']),
+                              'selenium-scripts/license.txt'
+        ]),
     ],
     packages=find_packages(),
     include_package_data=True,

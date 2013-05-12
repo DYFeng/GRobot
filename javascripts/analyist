@@ -1,0 +1,15 @@
+selenium-executionloop.js:71    resume: function()
+
+selenium-executionloop.js:94    _executeCurrentCommand : function()
+
+selenium-commandhandlers.js:304 ActionHandler.prototype.execute = function(seleniumApi, command)
+
+selenium-api.js:364             Selenium.prototype.doClickAt = function(locator, coordString)
+
+selenium-api.js:379             this.browserbot.clickElement
+
+selenium-browserbot.js:1892     BrowserBot.prototype.clickElement = function(element, clientX, clientY)
+
+selenium-browserbot.js:2491     MozillaBrowserBot.prototype._fireEventOnElement = function(eventType, element, clientX, clientY)
+
+selenium-browserbot.js:269      BrowserBot.prototype.triggerMouseEvent =

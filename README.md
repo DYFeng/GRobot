@@ -133,6 +133,18 @@ GRobot provide a method that open web page the following way:
 
     robot.open('http://my.web.page')
 
+##Web page actions###
+
+We have three shortcut method.
+
+    robot.reload()
+    robot.forward()
+    robot.back()
+
+If you want more action,check in [Qt Document](http://qt-project.org/doc/qt-4.8/qwebpage.html#WebAction-enum)
+
+    robot.trigger_action('SelectAll)
+
 ##Execute javascript##
 
 Executing javascripts inside webkit frame is one of the most interesting features provided by GRobot:
@@ -143,6 +155,7 @@ As many other GRobot methods, you can pass an extra parameter that tells GRobot 
 
     robot.evaluate( "document.getElementById('link').click();", expect_loading=True)
 
+##Dealing with forms##
 
 ###Type the text###
 Simulating human typing.
@@ -155,7 +168,7 @@ Type key by key,only ASCII character allowed.
 
 ###Select options###
 
-Select options those match [selector](option-selector) from `select` tag.
+Select the options those match [selector](option-selector) from `select` tag.
 
 Single selectbox.
 
@@ -230,6 +243,10 @@ That wait until a element match the given css selector.
 That wait until the given text exists inside the frame.
 
     result = robot.wait_for_text("My result")
+
+
+
+
 
 Sample use case
 ===============

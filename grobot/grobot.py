@@ -81,9 +81,9 @@ def have_a_break(func):
             interval = kwargs['sleep']
             del kwargs['sleep']
         else:
-            sleep=self.sleep
+            sleep = self.sleep
 
-        result=func(self, *args, **kwargs)
+        result = func(self, *args, **kwargs)
         gevent.sleep(sleep)
         return result
 
@@ -356,7 +356,7 @@ class GRobot(object):
                  display=False, viewport_size=(1024, 768), accept_language='en,*', ignore_ssl_errors=True,
                  cache_dir=os.path.join(tempfile.gettempdir(), "GRobot"),
                  image_enabled=True, plugins_enabled=False, java_enabled=False, javascript_enabled=True,
-                 plugin_path=None, develop=False, proxy=None,sleep=0.5):
+                 plugin_path=None, develop=False, proxy=None, sleep=0.5, jquery_namespace='GRobot'):
         """GRobot manages a QWebPage.
     
         @param user_agent: The default User-Agent header.
@@ -376,6 +376,7 @@ class GRobot(object):
         @param develop: Enable the Webkit Inspector.
         @param proxy: Set a Socks5,HTTP{S} Proxy
         @param sleep: Sleep `sleep` second,after operate
+        @param jquery_namespace: Set the jQuery namespace.
         """
 
         GRobot.exit_lock.acquire()
@@ -387,8 +388,8 @@ class GRobot(object):
         self.plugin = False
         self.exitLoop = False
         self.set_proxy(proxy)
-        self.sleep=sleep
-
+        self.sleep = sleep
+        self.jquery_namespace = jquery_namespace
         self.popup_messages = None
 
         self._confirm_expected = None
@@ -652,17 +653,14 @@ class GRobot(object):
             return css('#' + query)
 
         def link(query):
-            return xpath("//a[@text()='%s']" + query)
+            return xpath(u"//a[@text()='%s']" % query.replace("\'", "\\'"))
 
         def css(query):
-            # def qpoint_to_tuple(point):
-            #     return point.x(), point.y()
             result = []
             for ele in self.main_frame.findAllElements(query):
                 if not ele.isNull():
                     result.append(ele.geometry().center())
             return result
-            # return self.main_frame.findAllElements(query)
 
         def xpath(query):
             positions = self.evaluate(u"""
@@ -714,10 +712,17 @@ class GRobot(object):
 
         @return:
         """
-        self.loaded = False
-        self.trigger_action('Reload')
-        return self.wait_for_page_loaded()
 
+        self.trigger_action('Reload', expect_loading=True)
+
+    def back(self):
+        self.trigger_action('Back')
+
+    def forward(self):
+        self.trigger_action('Forward')
+
+
+    @can_load_page
     def trigger_action(self, action):
         """Trigger QWebPage::WebAction
 
@@ -764,8 +769,8 @@ class GRobot(object):
         return pos
 
 
-    def qpoint_to_tuple(self,qpoint):
-        return qpoint.x(),qpoint.y()
+    def qpoint_to_tuple(self, qpoint):
+        return qpoint.x(), qpoint.y()
 
     @have_a_break
     def move_to(self, selector):
@@ -789,7 +794,7 @@ class GRobot(object):
     def key_clicks(self, selector, text):
         if selector:
             self.click(selector)
-        QTest.keyClicks(self.webview, text,delay=50)
+        QTest.keyClicks(self.webview, text, delay=50)
 
     @have_a_break
     def type(self, selector, text):
@@ -803,7 +808,7 @@ class GRobot(object):
             core.events.setValue(this, '%s')
             """ % (text.replace("\n", "\\n").replace("\'", "\\'"))
         )
-        logger.debug('type %s %s'%(selector,text))
+        logger.debug('type %s %s' % (selector, text))
 
 
     def _hit_element_from(self, position):
@@ -816,7 +821,7 @@ class GRobot(object):
 
 
     def wait_forever(self):
-        self.wait_for(lambda :False,time_for_stop=-1)
+        self.wait_for(lambda: False, time_for_stop=-1)
 
     @have_a_break
     def check(self, selector, checked=True):
@@ -854,7 +859,7 @@ class GRobot(object):
             }
             """ % ( query.replace("\'", "\\'"), select_by, select_by))
 
-        def _add_selection(query, select_by, select,selected):
+        def _add_selection(query, select_by, select, selected):
             select.evaluateJavaScript(u"""
             triggerEvent(this, 'focus', false);
             var optionToSelect = '%s';
@@ -875,10 +880,10 @@ class GRobot(object):
             ele.setFocus()
 
             if ele.attribute('multiple') == 'multiple':
-                assert isinstance(value,list)
-                for value_,selected in value:
+                assert isinstance(value, list)
+                for value_, selected in value:
                     attr, pattern, val = self.parser_selector(value_, attr='text')
-                    _add_selection(val, attr, ele,selected)
+                    _add_selection(val, attr, ele, selected)
             else:
                 attr, pattern, val = self.parser_selector(value, attr='text')
                 _select(val, attr, ele)
@@ -1190,7 +1195,7 @@ class GRobot(object):
                     raise OperateTimeout, timeout_message
                 else:
                     # raise LoadingTimeout, timeout_message
-                    self.page.triggerAction(10) #QWebPage::Stop
+                    self.trigger_action('Stop') #QWebPage::Stop
                     self.loaded = True
                     logger.warning("Page loading timeout.Force to stop the page")
                     break
@@ -1222,56 +1227,19 @@ class GRobot(object):
             self.inspector.setPage(self.page)
             self.inspector.show()
 
-        selenium_scripts = [
+        scripts = [
             'atoms.js',
             'htmlutils.js',
-            # 'selenium-logging.js',
-            #
-            # 'find_matching_child.js',
-            # 'selenium-api.js',
-            # 'selenium-api-override.js',
-            #
-            # 'selenium-browserbot.js',
-            # 'selenium-browserdetect.js',
-            # 'selenium-commandhandlers.js',
-            # 'xmlextras.js',
         ]
 
-        for script in selenium_scripts:
-            self.evaluate_js_file(os.path.dirname(__file__) + '/../selenium-scripts/' + script)
+        if self.jquery_namespace:
+            scripts.append('jquery-1.9.1.min.js', )
 
-#         self.evaluate(
-#             """
-#             selenium=Selenium.createForWindow(window);
-#             GCrawlerFactory = new CommandHandlerFactory();
-#             GCrawlerFactory.registerAll(selenium);
-#
-#             function do_selenium_command(command,target,value)
-#             {
-#
-#                 var command=new SeleniumCommand(command,target,value, false);
-#                 var handler=GCrawlerFactory.getCommandHandler(command.command);
-#                 if (handler)
-#                 {
-#                     command.target = selenium.preprocessParameter(command.target);
-#                     command.value = selenium.preprocessParameter(command.value);
-#
-#                 try
-#                 {
-#                     handler.execute(selenium, command);
-#                 }catch(e)
-#                 {
-#                     if (e.isSeleniumError)
-#                         e.message;
-#                 }
-#
-#                 }else
-#                 {
-#                     'Do not hava command '+command.command;
-#                 }
-#             }
-#
-# """)
+        for script in scripts:
+            self.evaluate_js_file(os.path.dirname(__file__) + '/../javascripts/' + script)
+
+        if self.jquery_namespace:
+            self.evaluate(u"%s=jQuery.noConflict();" % self.jquery_namespace)
 
         self.loaded = True
         # self.cache.clear()
@@ -1279,6 +1247,7 @@ class GRobot(object):
 
     def _page_load_started(self):
         logger.debug("Start load page")
+
         self.loaded = False
 
     def _unsupported_content(self, reply):
