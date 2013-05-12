@@ -22,9 +22,9 @@ setup(
         ],
     data_files=[
         ('grobot', ['README.md','license.txt']),
-        ('selenium-scripts', ['selenium-scripts/atoms.js',
-                              'selenium-scripts/htmlutils.js',
-                              'selenium-scripts/license.txt'
+        ('javascripts', ['javascripts/atoms.js',
+                              'javascripts/htmlutils.js',
+                              'javascripts/license.txt'
         ]),
     ],
     packages=find_packages(),
