@@ -60,7 +60,7 @@ def can_load_page(func):
             expect_loading = kwargs['expect_loading']
             del kwargs['expect_loading']
         if expect_loading:
-            self.loaded = False
+            self._loaded = False
             func(self, *args, **kwargs)
             return self.wait_for_page_loaded()
         return func(self, *args, **kwargs)
@@ -132,11 +132,12 @@ class XPath(object):
 
 
 class GRobotNetworkAccessManager(QNetworkAccessManager):
-    def __init__(self, parent=None):
+    def __init__(self, robot, parent=None):
+        self._robot = robot
         super(GRobotNetworkAccessManager, self).__init__(parent)
 
     def createRequest(self, op, req, outgoingData=None):
-        req.setRawHeader('Accept-Language', 'en,*')
+        req.setRawHeader('Accept-Language', self._robot.accept_language)
         return super(GRobotNetworkAccessManager, self).createRequest(op, req, outgoingData)
 
 
@@ -149,7 +150,7 @@ class GRobotWebPage(QtWebKit.QWebPage):
     def __init__(self, robot, parent=None):
         super(GRobotWebPage, self).__init__(parent)
         self._robot = robot
-        self.setNetworkAccessManager(GRobotNetworkAccessManager(self))
+        self.setNetworkAccessManager(GRobotNetworkAccessManager(self._robot, self))
 
     def javaScriptConsoleMessage(self, message, line, source):
         """Prints client console message in current output stream."""
@@ -258,8 +259,7 @@ class QtMainLoop(object):
                 # GRobot._app.processEvents()
                 while self._app.hasPendingEvents():
                     self._app.processEvents()
-                    # gevent.sleep(0)
-                gevent.sleep(0)
+                gevent.sleep(0.01)
         except Exception, e:
             logger.error(e)
         logger.debug('Goodbye GRobot')
@@ -347,9 +347,7 @@ class prompt:
 class GRobot(object):
     _loop = None
     _liveRobot = 0
-
     _app = None
-
     exit_lock = RLock()
 
     def __init__(self, user_agent=default_user_agent, operate_timeout=10, loading_timeout=60, log_level=logging.WARNING,
@@ -365,7 +363,7 @@ class GRobot(object):
         @param log_level: The optional logging level.
         @param display: A boolean that tells GRobot to displays UI.
         @param viewport_size: A tupple that sets initial viewport size.
-        @param accept_language:
+        @param accept_language: Set the webkit accept language. 
         @param ignore_ssl_errors: A boolean that forces ignore ssl errors.
         @param cache_dir: A directory path where to store cache datas.
         @param image_enabled: Enable images.
@@ -380,17 +378,25 @@ class GRobot(object):
         """
 
         GRobot.exit_lock.acquire()
+        logger.setLevel(log_level)
+
         plugin_path = plugin_path or ['/usr/lib/mozilla/plugins', ]
 
         GRobot._liveRobot += 1
+
         self.develop = develop
         self.inspector = None
         self.plugin = False
         self.exitLoop = False
+
         self.set_proxy(proxy)
+
         self.sleep = sleep
         self.jquery_namespace = jquery_namespace
         self.popup_messages = None
+        self.accept_language = accept_language
+
+        self._loaded = True
 
         self._confirm_expected = None
         self._prompt_expected = None
@@ -405,8 +411,6 @@ class GRobot(object):
         self.operate_timeout = operate_timeout
 
         self.ignore_ssl_errors = ignore_ssl_errors
-
-        self.loaded = True
 
         if not sys.platform.startswith('win') and not 'DISPLAY' in os.environ \
             and not hasattr(GRobot, 'xvfb'):
@@ -432,8 +436,6 @@ class GRobot(object):
         QtWebKit.QWebSettings.globalSettings().setAttribute(QtWebKit.QWebSettings.LocalStorageEnabled, True)
 
         self.page.setForwardUnsupportedContent(True)
-
-
 
         # Page signals
         self.page.loadFinished.connect(self._page_loaded)
@@ -467,8 +469,6 @@ class GRobot(object):
             .connect(self._authenticate)
 
         self.main_frame = self.page.mainFrame()
-
-        logger.setLevel(log_level)
 
         self.webview = None
 
@@ -581,7 +581,7 @@ class GRobot(object):
         self._auth = auth
         self._auth_attempt = 0  # Avoids reccursion
         self.page.mainFrame().load(request, method, body)
-        self.loaded = False
+        self._loaded = False
 
         if default_popup_response is not None:
             self._prompt_expected = (default_popup_response, None)
@@ -599,6 +599,7 @@ class GRobot(object):
         if self.display:
             self.webview.resize(QSize(width, height))
         self.page.setViewportSize(QSize(width, height))
+
 
     def set_proxy(self, proxy=None):
         """Set the proxy or using system configuration as None,supported socks5 http{s}.
@@ -635,6 +636,11 @@ class GRobot(object):
 
 
     def elements_position(self, selector):
+        """Get the position of elements whose match selector
+
+        @param selector:
+        @return: position of QPoint
+        """
         attr, pattern, val = self.parser_selector(selector, attr='identifier')
 
         strip = lambda v: v.strip()
@@ -1173,7 +1179,7 @@ class GRobot(object):
         """Waits until page is loaded, assumed that a page as been requested.
 
         """
-        return self.wait_for(lambda: self.loaded,
+        return self.wait_for(lambda: self._loaded,
                              'Unable to load requested page', time_for_stop=time_for_stop)
 
     def wait_for(self, condition, timeout_message='', time_for_stop=None):
@@ -1183,7 +1189,7 @@ class GRobot(object):
         @param timeout_message: The exception message on timeout.-1 means never timeout.
         """
 
-        if self.loaded:
+        if self._loaded:
             time_for_stop = time_for_stop or self.operate_timeout
         else:
             time_for_stop = time_for_stop or self.loading_timeout
@@ -1191,12 +1197,12 @@ class GRobot(object):
         started_at = time.time()
         while not condition():
             if time_for_stop != -1 and time.time() > (started_at + time_for_stop):
-                if self.loaded:
+                if self._loaded:
                     raise OperateTimeout, timeout_message
                 else:
                     # raise LoadingTimeout, timeout_message
                     self.trigger_action('Stop') #QWebPage::Stop
-                    self.loaded = True
+                    self._loaded = True
                     logger.warning("Page loading timeout.Force to stop the page")
                     break
 
@@ -1241,14 +1247,14 @@ class GRobot(object):
         if self.jquery_namespace:
             self.evaluate(u"%s=jQuery.noConflict();" % self.jquery_namespace)
 
-        self.loaded = True
+        self._loaded = True
         # self.cache.clear()
         logger.debug("Page load finished")
 
     def _page_load_started(self):
         logger.debug("Start load page")
 
-        self.loaded = False
+        self._loaded = False
 
     def _unsupported_content(self, reply):
         """Adds an HttpResource object to http_resources with unsupported

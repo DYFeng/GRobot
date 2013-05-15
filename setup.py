@@ -10,7 +10,7 @@ from glob import glob
 
 setup(
     name='GRobot',
-    version='0.0.2',
+    version='0.0.3',
     url='https://github.com/DYFeng/GRobot',
     license='MIT',
     author='DY.Feng',
