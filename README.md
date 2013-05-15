@@ -58,7 +58,7 @@ Install Flask for unittest(optional).
 
 Install GRobot using pip.
 
-    pip install git+https://github.com/DYFeng/GRobot.git
+    pip install GRobot
 
 How to use
 ============
