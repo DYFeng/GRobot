@@ -5,8 +5,8 @@ GRobot
 Powerful Web Robot.
 
 """
-from setuptools import setup, find_packages
-from glob import glob
+from setuptools import setup
+
 setup(
     name='GRobot',
     version='0.0.12',
