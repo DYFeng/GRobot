@@ -7,10 +7,9 @@ Powerful Web Robot.
 """
 from setuptools import setup, find_packages
 from glob import glob
-
 setup(
     name='GRobot',
-    version='0.0.3',
+    version='0.0.11',
     url='https://github.com/DYFeng/GRobot',
     license='MIT',
     author='DY.Feng',
@@ -20,11 +19,7 @@ setup(
     install_requires=[
         'lxml',
         ],
-    data_files=[
-        ('grobot', ['README.md','license.txt']),
-        ('javascripts',glob('javascripts/*.js') ),
-    ],
-    packages=find_packages(),
+    packages=['grobot'],
     include_package_data=True,
     zip_safe=False,
     platforms='any',

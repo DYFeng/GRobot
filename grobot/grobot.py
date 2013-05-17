@@ -1242,7 +1242,7 @@ class GRobot(object):
             scripts.append('jquery-1.9.1.min.js', )
 
         for script in scripts:
-            self.evaluate_js_file(os.path.dirname(__file__) + '/../javascripts/' + script)
+            self.evaluate_js_file(os.path.dirname(__file__) + '/javascripts/' + script)
 
         if self.jquery_namespace:
             self.evaluate(u"%s=jQuery.noConflict();" % self.jquery_namespace)

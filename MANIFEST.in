@@ -1,0 +1,4 @@
+include README.md license.txt
+recursive-include grobot *.py *.js
+recursive-include example *
+recursive-include tests *
