@@ -17,7 +17,7 @@ setup(
     description='Powerful Web Robot.',
     long_description=__doc__,
     install_requires=[
-        'lxml',
+        'lxml','SOAPpy'
         ],
     packages=['grobot'],
     include_package_data=True,
