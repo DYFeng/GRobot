@@ -61,8 +61,9 @@ def can_load_page(func):
             del kwargs['expect_loading']
         if expect_loading:
             self._loaded = False
-            func(self, *args, **kwargs)
-            return self.wait_for_page_loaded()
+            result = func(self, *args, **kwargs)
+            self.wait_for_page_loaded()
+            return result
         return func(self, *args, **kwargs)
 
     return wrapper
@@ -116,17 +117,17 @@ class XPath(object):
     def __init__(self, content=None):
         if content is not None:
             if isinstance(content, HTML.HtmlElement):
-                self.__parser_content = content
+                self._parser_content = content
             else:
                 self.compile(content)
 
     def compile(self, content):
-        self.__parser_content = HTML.document_fromstring(content)
+        self._parser_content = HTML.document_fromstring(content)
 
     def execute(self, *arg, **kwargs):
         try:
-            return map(lambda x: unicode(x) if isinstance(x, basestring) else x,
-                       self.__parser_content.xpath(*arg, **kwargs))
+            return map(lambda x: unicode(x) if isinstance(x, basestring) else XPath(x),
+                       self._parser_content.xpath(*arg, **kwargs))
         except Exception:
             return None
 
@@ -242,7 +243,10 @@ class QtMainLoop(object):
         self._stop = True
         self._greenlet.join(timeout=10)
         self._greenlet = None
-        sip.delete(self._app)
+        try:
+            sip.delete(self._app)
+        except RuntimeError:
+            pass
 
 
     def start(self):
@@ -348,6 +352,7 @@ class GRobot(object):
     _loop = None
     _liveRobot = 0
     _app = None
+    _kill_loop=None
     exit_lock = RLock()
 
     def __init__(self, user_agent=default_user_agent, operate_timeout=10, loading_timeout=60, log_level=logging.WARNING,
@@ -378,6 +383,11 @@ class GRobot(object):
         """
 
         GRobot.exit_lock.acquire()
+
+        if GRobot._kill_loop:
+            gevent.kill(GRobot._kill_loop)
+            GRobot._kill_loop=None
+
         logger.setLevel(log_level)
 
         plugin_path = plugin_path or ['/usr/lib/mozilla/plugins', ]
@@ -388,6 +398,7 @@ class GRobot(object):
         self.inspector = None
         self.plugin = False
         self.exitLoop = False
+        self._deleted = False
 
         self.set_proxy(proxy)
 
@@ -511,10 +522,10 @@ class GRobot(object):
         return unicode(self.main_frame.url().toString())
 
 
-    @property
+
     def content(self):
         """Returns current frame HTML as a string."""
-        return unicode(self.page.currentFrame().toHtml())
+        return unicode(self.main_frame.toHtml())
 
     @property
     def cookies(self):
@@ -659,7 +670,7 @@ class GRobot(object):
             return css('#' + query)
 
         def link(query):
-            return xpath(u"//a[@text()='%s']" % query.replace("\'", "\\'"))
+            return xpath(u"//a[text()='%s']" % query.replace("\'", "\\'"))
 
         def css(query):
             result = []
@@ -760,7 +771,12 @@ class GRobot(object):
     def click(self, selector):
         qpoint = self.first_element_position(selector)
         if qpoint:
-            return self._click_position(qpoint)
+            return self.qpoint_to_tuple(self._click_position(qpoint))
+
+    @can_load_page
+    @have_a_break
+    def test(self):
+        return self.qpoint_to_tuple(QPoint(1, 2))
 
 
     @can_load_page
@@ -786,15 +802,17 @@ class GRobot(object):
             return qpoint_to_tuple(qpoint)
 
     def move_at(self, x, y):
-        self._move_to_position(QPoint(x, y))
+        return self._move_to_position(QPoint(x, y))
 
     def _move_to_position(self, qpoint):
         QTest.mouseMove(self.webview, pos=qpoint)
         return qpoint
 
+    @can_load_page
     @have_a_break
     def click_at(self, x, y):
-        self._click_position(QPoint(x, y))
+        return self._click_position(QPoint(x, y))
+
 
     @have_a_break
     def key_clicks(self, selector, text):
@@ -806,7 +824,7 @@ class GRobot(object):
     def type(self, selector, text):
         position = self.click(selector)
 
-        ele = self._hit_element_from(position)
+        ele = self._hit_element_from(QPoint(*position))
 
         ele.setFocus()
         ele.evaluateJavaScript(
@@ -985,7 +1003,7 @@ class GRobot(object):
     def __del__(self):
         """Depend on the CG of Python.
         """
-        self._exit()
+        self.exit()
 
 
     def delete_cookies(self):
@@ -1042,7 +1060,7 @@ class GRobot(object):
         @param path: The path to save.
         """
         f = open(path, 'w')
-        f.write(self.content.encode('utf-8'))
+        f.write(self.content().encode('utf-8'))
         f.close()
 
     def global_exists(self, global_name):
@@ -1156,13 +1174,13 @@ class GRobot(object):
 
         logger.debug("Wait for text %s" % text)
 
-        self.wait_for(lambda: text in self.content,
+        self.wait_for(lambda: text in self.content(),
                       "Can\'t find '%s' in current frame" % text, time_for_stop=time_for_stop)
 
         return self.wait_for_page_loaded()
 
     def wait_for_xpath(self, expression, time_for_stop=None):
-        self.wait_for(lambda: XPath(self.content).execute(expression),
+        self.wait_for(lambda: XPath(self.content()).execute(expression),
                       "Can't find xpath=%s in current frame" % expression, time_for_stop=time_for_stop)
         return self.wait_for_page_loaded()
 
@@ -1309,29 +1327,36 @@ class GRobot(object):
             logger.warning('SSL certificate error: %s' % url)
 
 
-    def _exit(self):
+    def exit(self):
         """Destroy the Qt main event loop.
 
         """
         GRobot.exit_lock.acquire()
-        if self.inspector:
-            self.inspector.close()
-            sip.delete(self.inspector)
+        if not self._deleted:
+            if self.inspector:
+                self.inspector.close()
+                sip.delete(self.inspector)
 
-        if self.display:
-            self.webview.close()
-            sip.delete(self.webview)
+            if self.display:
+                self.webview.close()
+                sip.delete(self.webview)
 
-        if self.page and not sip.isdeleted(self.page):
-            sip.delete(self.page)
+            if self.page and not sip.isdeleted(self.page):
+                sip.delete(self.page)
 
-        GRobot._liveRobot -= 1
+            GRobot._liveRobot -= 1
 
-        if GRobot._liveRobot == 0 and GRobot._loop is not None:
+            if GRobot._liveRobot == 0 and GRobot._loop is not None:
+                GRobot._kill_loop=gevent.spawn_later(20,self.kill_loop)
 
-            GRobot._loop.stop()
-            GRobot._loop = None
-            GRobot._app = None
-            if hasattr(self, 'xvfb'):
-                GRobot.xvfb.terminate()
+
+            self._deleted = True
+
         GRobot.exit_lock.release()
+
+    def kill_loop(self):
+        GRobot._loop.stop()
+        GRobot._loop = None
+        GRobot._app = None
+        if hasattr(self, 'xvfb'):
+            GRobot.xvfb.terminate()

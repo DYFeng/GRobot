@@ -50,7 +50,7 @@ class GRobotGeneralTest(GRobotTest):
     def test_open(self):
         self.robot.open(base_url)
         self.assertEqual(self.robot.url, base_url)
-        self.assertTrue("Test page" in self.robot.content)
+        self.assertTrue("Test page" in self.robot.content())
 
 
     def test_evaluate(self):
@@ -96,7 +96,7 @@ class GRobotGeneralTest(GRobotTest):
         self.robot.delete_cookies()
         self.robot.load_cookies('testcookie.txt')
         self.robot.open("%sget/cookie" % base_url)
-        self.assertTrue('OK' in self.robot.content)
+        self.assertTrue('OK' in self.robot.content())
         os.remove('testcookie.txt')
 
     # def test_capture_to(self):
@@ -122,13 +122,13 @@ class GRobotGeneralTest(GRobotTest):
     def test_basic_http_auth_success(self):
         self.robot.open("%sbasic-auth" % base_url,
                         auth=('admin', 'secret'))
-        self.assertIn('successfully authenticated', self.robot.content)
+        self.assertIn('successfully authenticated', self.robot.content())
 
 
     def test_basic_http_auth_error(self):
         self.robot.open("%sbasic-auth" % base_url,
                         auth=('admin', 'wrongsecret'))
-        self.assertIn('Could not verify your access level for that URL.', self.robot.content)
+        self.assertIn('Could not verify your access level for that URL.', self.robot.content())
 
 
     def test_unsupported_content(self):
@@ -139,13 +139,13 @@ class GRobotGeneralTest(GRobotTest):
 
     def test_url_with_hash(self):
         self.robot.open("%surl-hash" % base_url)
-        self.assertIsNotNone(self.robot.content)
-        self.assertTrue("Test page" in self.robot.content)
+        self.assertIsNotNone(self.robot.content())
+        self.assertTrue("Test page" in self.robot.content())
 
 
     def test_url_with_hash_header(self):
         self.robot.open("%surl-hash-header" % base_url)
-        self.assertTrue("Welcome" in self.robot.content)
+        self.assertTrue("Welcome" in self.robot.content())
 
 
     def test_wait_for_selector(self):
@@ -187,7 +187,7 @@ class GRobotGeneralTest(GRobotTest):
 
 
 
-class GrobotNativeTest(GRobotTest):
+class GRobotNativeTest(GRobotTest):
 
     # def test_postion(self):
     #     self.robot.open(base_url)
@@ -277,7 +277,7 @@ class GrobotNativeTest(GRobotTest):
         self.robot.key_clicks('textarea','Here is a sample text.')
         self.robot.click("xpath=//input[@type='submit']", expect_loading=True)
 
-        self.assertIn('form successfully posted', self.robot.content)
+        self.assertIn('form successfully posted', self.robot.content())
 
 
 
@@ -440,8 +440,6 @@ class GrobotNativeTest(GRobotTest):
             os.path.dirname(__file__), 'uploaded_blackhat.jpg')
         self.assertTrue(os.path.isfile(file_path))
         os.remove(file_path)
-
-
 
 
 if __name__ == '__main__':
