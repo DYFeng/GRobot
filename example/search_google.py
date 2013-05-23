@@ -22,7 +22,7 @@ def main():
 
         robot.wait_for_xpath("//tr/td[@class='cur' and text()='%s']" % i)
 
-        if u'https://github.com/DYFeng/GRobot' in robot.content:
+        if u'https://github.com/DYFeng/GRobot' in robot.content():
             print 'The porject in page', i
             break
 

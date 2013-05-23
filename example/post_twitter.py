@@ -31,7 +31,7 @@ def main():
             break
         except:
             #Something go wrong,refresh page.
-            if 'refresh the page' in robot.content:
+            if 'refresh the page' in robot.content():
                 robot.reload()
 
     # Wait forever.

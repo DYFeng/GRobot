@@ -79,7 +79,7 @@ def have_a_break(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         if 'sleep' in kwargs:
-            interval = kwargs['sleep']
+            sleep = kwargs['sleep']
             del kwargs['sleep']
         else:
             sleep = self.sleep

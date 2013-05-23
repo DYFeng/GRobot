@@ -13,7 +13,7 @@ from grobot import GRobot
 def test():
     robot = GRobot()
     robot.open("http://www.yahoo.com")
-    assert 'yahoo' in robot.content
+    assert 'yahoo' in robot.content()
 
 gevent.spawn(test).join()
 ```
@@ -284,7 +284,7 @@ def main():
             break
         except :
             #Something go wrong,refresh page.
-            if 'refresh the page' in robot.content:
+            if 'refresh the page' in robot.content():
                 robot.reload()
 
     # Wait forever.
@@ -322,7 +322,7 @@ def main():
 
         robot.wait_for_xpath("//tr/td[@class='cur' and text()='%s']" % i)
 
-        if u'https://github.com/DYFeng/GRobot' in robot.content:
+        if u'https://github.com/DYFeng/GRobot' in robot.content():
             print 'The porject in page', i
             break
 
