@@ -7,8 +7,7 @@ virtualenv:
 install:
   - sudo apt-get update
   - sudo apt-get install python-qt4
-  - pip install http://gevent.googlecode.com/files/gevent-1.0b3.tar.gz#egg=gevent
-  - pip install Flask lxml SOAPpy
+  - pip install gevent Flask lxml SOAPpy
   - python setup.py install
 before_script:
   - "export DISPLAY=:99.0"

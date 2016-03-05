@@ -521,8 +521,7 @@ class GRobot(object):
     def url(self):
         return unicode(self.main_frame.url().toString())
 
-
-
+    @property
     def content(self):
         """Returns current frame HTML as a string."""
         return unicode(self.main_frame.toHtml())
@@ -1060,7 +1059,7 @@ class GRobot(object):
         @param path: The path to save.
         """
         f = open(path, 'w')
-        f.write(self.content().encode('utf-8'))
+        f.write(self.content.encode('utf-8'))
         f.close()
 
     def global_exists(self, global_name):
@@ -1174,13 +1173,13 @@ class GRobot(object):
 
         logger.debug("Wait for text %s" % text)
 
-        self.wait_for(lambda: text in self.content(),
+        self.wait_for(lambda: text in self.content,
                       "Can\'t find '%s' in current frame" % text, time_for_stop=time_for_stop)
 
         return self.wait_for_page_loaded()
 
     def wait_for_xpath(self, expression, time_for_stop=None):
-        self.wait_for(lambda: XPath(self.content()).execute(expression),
+        self.wait_for(lambda: XPath(self.content).execute(expression),
                       "Can't find xpath=%s in current frame" % expression, time_for_stop=time_for_stop)
         return self.wait_for_page_loaded()
 

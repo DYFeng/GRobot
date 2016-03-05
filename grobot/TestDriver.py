@@ -1,17 +1,11 @@
 import SOAPpy
 
-class GRobotTestDriver(object):
 
+class GRobotTestDriver(object):
     def __init__(self, *args, **kwargs):
         self.session_id = None
 
-        if 'server' in kwargs:
-            server = kwargs['server']
-            del kwargs['server']
-        else:
-            server = "http://127.0.0.1:8888"
-
-        self.grobot_server = SOAPpy.SOAPProxy(server)
+        self.grobot_server = SOAPpy.SOAPProxy(kwargs.pop('server', 'http://127.0.0.1:8888'))
 
         self.session_id = self.grobot_server.create_robot(*args, **kwargs)
 
@@ -20,4 +14,3 @@ class GRobotTestDriver(object):
 
     def exit(self):
         self.grobot_server.destroy_robot(self.session_id)
-
