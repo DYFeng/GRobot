@@ -21,7 +21,7 @@ gevent.spawn(test).join()
 What it can and can't do
 ==========================
 
-##Can do##
+## Can do ##
 
 - Can set up the socks5/http{s} proxy.
 - Can simulate *ALL* the operations of hunman beings.
@@ -30,7 +30,7 @@ What it can and can't do
 - Can grab the web page as image.
 - Can run on a GUI-Less server(by install xvfb).
 
-##Can't do##
+## Can't do ##
 
 - Can't operate Flash.
 - Can't run without PyQt and gevent
@@ -63,7 +63,7 @@ Install GRobot using pip.
 How to use
 ============
 
-##Quick start##
+## Quick start ##
 
 First of all, you need a instance of GRobot in greenlet:
 
@@ -79,7 +79,7 @@ gevent.spawn(test).join()
 ```
 
 
-##Element selector##
+## Element selector ##
 
 Element selector tell GRobot which HTML element a command refers to.
 The format of a selector is:
@@ -111,7 +111,7 @@ Please refer to [CSS2 selectors](http://www.w3.org/TR/CSS2/selector.html) for mo
         css=a[href="#id3"]
         css=span#firstChild + span
 
-##Option Selector##
+## Option Selector ##
 
 When you using [GRobot.select](#select-options) to deal with `select` tag,option selector tell GRobot which option you want.
 The format of a selector is:
@@ -127,13 +127,13 @@ We support the following strategies for locating elements:
 
 
 
-##Open a web page##
+## Open a web page ##
 
 GRobot provide a method that open web page the following way:
 
     robot.open('http://my.web.page')
 
-##Web page actions###
+## Web page actions ###
 
 We have three shortcut method.
 
@@ -145,7 +145,7 @@ If you want more action,check in [Qt Document](http://qt-project.org/doc/qt-4.8/
 
     robot.trigger_action('SelectAll)
 
-##Execute javascript##
+## Execute javascript ##
 
 Executing javascripts inside webkit frame is one of the most interesting features provided by GRobot:
 
@@ -155,9 +155,9 @@ As many other GRobot methods, you can pass an extra parameter that tells GRobot 
 
     robot.evaluate( "document.getElementById('link').click();", expect_loading=True)
 
-##Dealing with forms##
+## Dealing with forms ##
 
-###Type the text###
+### Type the text ###
 Simulating human typing.
 
     robot.type('id=blog_content',u'Hello,world.I'm Tom.\n你好,世界.我是无名氏\n')
@@ -166,7 +166,7 @@ Type key by key,only ASCII character allowed.
 
     robot.key_clicks('id=blog_content','Hello,world.\rToday is good for sleep.')
 
-###Select options###
+### Select options ###
 
 Select the options those match [selector](option-selector) from `select` tag.
 
@@ -182,7 +182,7 @@ Multiple selectbox.
         ('banana',True),
     ])
 
-###Set the checkbox###
+### Set the checkbox ###
 
 You can specify the state of checkbox.
 
@@ -195,7 +195,7 @@ Uncheck it.
     robot.check('id=agree',False)
 
 
-###Click something###
+### Click something ###
 
 Click the first element which selected by selector.
 
@@ -205,7 +205,7 @@ Click a point of the absolute position (1500,36).
 
     robot.click_at(1500,36)
 
-###Move the mouse###
+### Move the mouse ###
 
 Move your mouse to first element which selected by selector.
 
@@ -215,30 +215,30 @@ Move your mouse to the absolute position (500,300).
 
     robot.move_at(500,300)
 
-###Setup input file###
+### Setup input file ###
 
 Selenium can't access the `<input type='file'/>` tag.You can't use selenium to set up a file type input.
 
     robot.choose_file('id=file-upload', '/tmp/file')
 
-##Waiters##
+## Waiters ##
 
 GRobot provides several methods for waiting for specific things before the script continue execution:
 
-###wait_for_page_loaded()###
+### wait_for_page_loaded() ###
 
 That wait until a new page is loaded.
 
     robot.wait_for_page_loaded()
 
 
-###wait_for_selector(selector)###
+### wait_for_selector(selector) ###
 
 That wait until a element match the given css selector.
 
     result = robot.wait_for_selector("ul.results")
 
-###wait_for_text(text)###
+### wait_for_text(text) ###
 
 That wait until the given text exists inside the frame.
 
@@ -251,7 +251,7 @@ That wait until the given text exists inside the frame.
 Sample use case
 ===============
 
-###Post a twitter###
+### Post a twitter ###
 
 ```python
 import gevent
@@ -295,7 +295,7 @@ if __name__ == '__main__':
 ```
 
 
-###Browsing Google.com and find GRobot project###
+### Browsing Google.com and find GRobot project ###
 
 ```python
 import gevent
